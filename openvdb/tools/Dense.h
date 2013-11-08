@@ -82,7 +82,7 @@ copyFromDense(
 
 ////////////////////////////////////////
 
-
+    
 /// @brief Dense is a simple dense grid API used by the CopyToDense and
 /// CopyFromDense classes defined below.
 /// @details Use the Dense class to efficiently produce a dense in-memory
@@ -139,7 +139,7 @@ public:
         if (mBBox.empty()) {
             OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
         }
-    }
+    }    
 
     /// @brief Construct a dense grid with a given origin and dimensions.
     ///
@@ -173,46 +173,50 @@ public:
     /// @brief Return the stride of the array in the y direction ( = dimZ).
     /// @note This method is required by both CopyToDense and CopyFromDense.
     size_t yStride() const { return mY; }
+    
+    /// @brief Return the stride of the array in the z direction ( = 1).
+    /// @note This method is required by both CopyToDense and CopyFromDense.
+    static size_t zStride() { return 1; }
 
     /// @brief Return the number of voxels contained in this grid.
-    Index64 valueCount() const { return mBBox.volume(); }
+    inline Index64 valueCount() const { return mBBox.volume(); }
 
     /// @brief Set the value of the voxel at the given array offset.
-    void setValue(size_t offset, const ValueT& value) { mData[offset] = value; }
+    inline void setValue(size_t offset, const ValueT& value) { mData[offset] = value; }
 
     /// @brief Return the value of the voxel at the given array offset.
     const ValueT& getValue(size_t offset) const { return mData[offset]; }
 
     /// @brief Set the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
-    void setValue(size_t i, size_t j, size_t k, const ValueT& value)
+    inline void setValue(size_t i, size_t j, size_t k, const ValueT& value)
     {
         mData[this->coordToOffset(i,j,k)] = value;
     }
 
     /// @brief Return the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
-    const ValueT& getValue(size_t i, size_t j, size_t k) const
+    inline const ValueT& getValue(size_t i, size_t j, size_t k) const
     {
         return mData[this->coordToOffset(i,j,k)];
     }
 
     /// @brief Set the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
-    void setValue(const Coord& xyz, const ValueT& value)
+    inline void setValue(const Coord& xyz, const ValueT& value)
     {
         mData[this->coordToOffset(xyz)] = value;
     }
 
     /// @brief Return the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
-    const ValueT& getValue(const Coord& xyz) const
+    inline const ValueT& getValue(const Coord& xyz) const
     {
         return mData[this->coordToOffset(xyz)];
     }
 
     /// @brief Fill this grid with a constant value.
-    void fill(const ValueT& value)
+    inline void fill(const ValueT& value)
     {
         size_t size = this->valueCount();
         ValueT* a = mData;
@@ -244,7 +248,11 @@ public:
                                    size_t(xyz[2]-mBBox.min()[2]));
     }
 
-    Index64 memUsage() const{ return sizeof(*this) + mBBox.volume() * sizeof(ValueType); }
+    /// @brief Return the memory footprint of this Dense grid in bytes.
+    inline Index64 memUsage() const
+    {
+        return sizeof(*this) + mBBox.volume() * sizeof(ValueType);
+    }
 
 private:
     void initArray()
@@ -255,13 +263,12 @@ private:
         mArray.reset(new ValueT[mBBox.volume()]);
         mData = mArray.get();
     }
-
+    
     const CoordBBox mBBox;//signed coordinates of the domain represented by the grid
     boost::shared_array<ValueT> mArray;
     ValueT* mData;//raw c-style pointer to values
     const size_t mY, mX;//strides in x and y (by design it's 1 in z)
-};// end of Dense
-
+};// end of Dense    
 
 ////////////////////////////////////////
 
