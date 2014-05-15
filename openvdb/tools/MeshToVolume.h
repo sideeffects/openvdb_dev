@@ -517,7 +517,7 @@ MeshVoxelizer<FloatTreeT, InterruptT>::MeshVoxelizer(
     , mPolygonList(polygonList)
     , mSqrDistTree(std::numeric_limits<FloatValueT>::max())
     , mSqrDistAccessor(mSqrDistTree)
-    , mPrimIndexTree(Int32(util::INVALID_IDX)) 
+    , mPrimIndexTree(Int32(util::INVALID_IDX))
     , mPrimIndexAccessor(mPrimIndexTree)
     , mIntersectionTree(false)
     , mIntersectionAccessor(mIntersectionTree)
@@ -856,7 +856,7 @@ int
 ContourTracer<FloatTreeT, InterruptT>::sparseScan(int slice) const
 {
     bool lastVoxelWasOut = true;
-    int last_k;
+    int last_k = mBBox.min()[2];
 
     Coord ijk(slice, mBBox.min()[1], mBBox.min()[2]);
     Coord step(mStepSize[mDistAccessor.getValueDepth(ijk) + 1]);
@@ -1116,7 +1116,7 @@ public:
 
 private:
     // disallow copy by assignment
-    void operator=(const PropagateSign<FloatTreeT, InterruptT>&) {}
+    void operator=(const PropagateSign<FloatTreeT, InterruptT>&);
     bool wasInterrupted() const { return mInterrupter && mInterrupter->wasInterrupted(); }
 
     BoolLeafManager& mOldSignMaskLeafs;
@@ -1516,14 +1516,14 @@ IntersectingVoxelCleaner<FloatTreeT>::operator()(
 
                 offset = iter.pos();
 
-                if(distLeaf->getValue(offset) > 0.1) continue;
+                if(distLeaf->getValue(offset) > 0.0) continue;
 
                 ijk = iter.getCoord();
                 turnOff = true;
                 for (Int32 m = 0; m < 26; ++m) {
                     m_ijk = ijk + util::COORD_OFFSETS[m];
                     if (distAcc.probeValue(m_ijk, value)) {
-                        if (value > 0.1) {
+                        if (value > 0.0) {
                             turnOff = false;
                             break;
                         }
@@ -1657,7 +1657,7 @@ ShellVoxelCleaner<FloatTreeT>::operator()(
 
             ijk = iter.getCoord();
             turnOff = true;
-            for (Int32 m = 0; m < 18; ++m) {
+            for (Int32 m = 0; m < 26; ++m) {
                 m_ijk = ijk + util::COORD_OFFSETS[m];
                 if (maskAcc.isValueOn(m_ijk)) {
                     turnOff = false;
@@ -1675,6 +1675,28 @@ ShellVoxelCleaner<FloatTreeT>::operator()(
 
 
 ////////////////////////////////////////
+
+
+template<typename TreeType>
+struct CopyActiveVoxelsOp
+{
+    typedef typename tree::ValueAccessor<TreeType> AccessorT;
+
+    CopyActiveVoxelsOp(TreeType& tree) : mAcc(tree) { }
+
+    template <typename LeafNodeType>
+    void operator()(LeafNodeType &leaf, size_t) const
+    {
+        LeafNodeType* rhsLeaf = const_cast<LeafNodeType*>(mAcc.probeLeaf(leaf.origin()));
+        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
+        for (; iter; ++iter) {
+            rhsLeaf->setValueOnly(iter.pos(), iter.getValue());
+        }
+    }
+
+private:
+    AccessorT mAcc;
+};
 
 
 // ExpandNB
@@ -1786,11 +1808,17 @@ ExpandNB<FloatTreeT>::run(bool threaded)
     if (threaded) tbb::parallel_reduce(mMaskLeafs.getRange(), *this);
     else (*this)(mMaskLeafs.getRange());
 
-    mDistTree.merge(mNewDistTree);
+    // Copy only the active voxels (tree::merge does branch stealing
+    // which also moves indicative values).
+    mDistTree.topologyUnion(mNewDistTree);
+    tree::LeafManager<FloatTreeT> leafs(mNewDistTree);
+    leafs.foreach(CopyActiveVoxelsOp<FloatTreeT>(mDistTree));
+
     mIndexTree.merge(mNewIndexTree);
 
     mMaskTree.clear();
     mMaskTree.merge(mNewMaskTree);
+
 }
 
 
@@ -1824,11 +1852,12 @@ ExpandNB<FloatTreeT>::operator()(const tbb::blocked_range<size_t>& range)
         ijk = maskLeaf.origin();
 
         FloatLeafT* distLeafPt = distAcc.probeLeaf(ijk);
+
         if (!distLeafPt) {
             distLeafPt = new FloatLeafT(ijk, distAcc.getValue(ijk));
             newDistAcc.addLeaf(distLeafPt);
         }
-     
+
         IntLeafT* indexLeafPt = indexAcc.probeLeaf(ijk);
         if (!indexLeafPt) indexLeafPt =  newIndexAcc.touchLeaf(ijk);
 
@@ -2227,6 +2256,30 @@ private:
 };
 
 
+template<typename ValueType>
+struct SDFPrune
+{
+    SDFPrune(const ValueType& out, const ValueType& in)
+        : outside(out)
+        , inside(in)
+    {
+    }
+
+    template <typename ChildType>
+    bool operator()(ChildType& child)
+    {
+        child.pruneOp(*this);
+        if (!child.isInactive()) return false;
+        value = math::isNegative(child.getFirstValue()) ? inside : outside;
+        return true;
+    }
+
+    static const bool state = false;
+    const ValueType   outside, inside;
+    ValueType         value;
+};
+
+
 } // internal namespace
 
 
@@ -2318,7 +2371,6 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         mIntersectingVoxelsGrid->tree().merge(voxelizer.intersectionTree());
     }
 
-
     if (!unsignedDistField) {
         // Determine the inside/outside state for the narrow band of voxels.
         {
@@ -2351,9 +2403,10 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
                     internal::PropagateSign<FloatTreeT, InterruptT> sign(leafs,
                         mDistGrid->tree(), mIntersectingVoxelsGrid->tree(), mInterrupter);
-                    sign.run();
-                    signMaskTree.clear();
 
+                    sign.run();
+
+                    signMaskTree.clear();
                     signMaskTree.merge(sign.signMaskTree());
                 }
             }
@@ -2361,7 +2414,6 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
 
         if (wasInterrupted(28)) return;
-
         {
             tree::LeafManager<BoolTreeT> leafs(mIntersectingVoxelsGrid->tree());
 
@@ -2375,17 +2427,14 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
             // Remove mesh intersecting voxels that where set by rasterizing
             // self-intersecting portions of the mesh.
-            if (!rawData) {
-                internal::IntersectingVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
-                    mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
-                cleaner.run();
-            }
+            internal::IntersectingVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
+                mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
+            cleaner.run();
         }
 
         // Remove shell voxels that where set by rasterizing
         // self-intersecting portions of the mesh.
-        if (!rawData) {
-
+        {
             tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
 
             internal::ShellVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
@@ -2413,7 +2462,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     if (wasInterrupted(40)) return;
 
     if (!unsignedDistField) { // Propagate sign information to inactive values.
-        mDistGrid->tree().getRootNode().setBackground(exBandWidth, /*updateChildNodes=*/false);
+        mDistGrid->tree().root().setBackground(exBandWidth, /*updateChildNodes=*/false);
         mDistGrid->tree().signedFloodFill(exBandWidth, -inBandWidth);
     }
 
@@ -2462,7 +2511,6 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
             if ((++count) >= maxIterations) break;
             progress += step;
         }
-
     }
 
     if (!bool(GENERATE_PRIM_INDEX_GRID & mConversionFlags)) mIndexGrid->clear();
@@ -2489,13 +2537,13 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
         leafs.foreach(internal::MinOp<FloatTreeT, FloatValueT>(leafs));
 
-        if (wasInterrupted(92)) return;
+        if (wasInterrupted(95)) return;
 
         offsetOp.resetOffset(offset - internal::Tolerance<FloatValueT>::epsilon());
         leafs.foreach(offsetOp);
     }
 
-    if (wasInterrupted(95)) return;
+    if (wasInterrupted(98)) return;
 
     const FloatValueT minTrimWidth = voxelSize * 4.0;
     if (inBandWidth < minTrimWidth || exBandWidth < minTrimWidth) {
@@ -2507,12 +2555,10 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
         leafs.foreach(internal::TrimOp<FloatValueT>(
             exBandWidth, unsignedDistField ? exBandWidth : inBandWidth));
+
+        internal::SDFPrune<FloatValueT> sdfPrune(exBandWidth, -inBandWidth);
+        mDistGrid->tree().pruneOp(sdfPrune);
     }
-
-    if (wasInterrupted(99)) return;
-
-    mDistGrid->tree().pruneLevelSet();    
-    mDistGrid->tree().signedFloodFill(exBandWidth, -inBandWidth);
 }
 
 
