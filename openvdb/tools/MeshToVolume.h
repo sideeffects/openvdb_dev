@@ -3048,7 +3048,8 @@ meshToVolume(
     if (interrupter.wasInterrupted(50)) return distGrid;
 
     if (distTree.activeVoxelCount() == 0) {
-        distGrid.reset((new GridType(ValueType(0.0))));
+	distTree.clear();
+	distTree.root().setBackground(exteriorWidth, /*updateChildNodes=*/false);
         return distGrid;
     }
 
