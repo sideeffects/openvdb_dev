@@ -82,17 +82,17 @@ private:
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
 #ifdef _MSC_VER
-	    using namespace boost::interprocess::detail;
-	    using namespace boost::interprocess::ipcdetail;
-	    using openvdb::Index64;
+            using namespace boost::interprocess::detail;
+            using namespace boost::interprocess::ipcdetail;
+            using openvdb::Index64;
 
-	    if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
-		FILETIME mtime;
-		if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
-		    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
-		}
-		close_file(fh);
-	    }
+            if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
+                FILETIME mtime;
+                if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
+                    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
+                }
+                close_file(fh);
+            }
 #else
             struct stat info;
             if (0 == ::stat(regionFilename, &info)) {
@@ -167,6 +167,9 @@ using namespace openvdb::points;
 class TestAttributeArray: public CppUnit::TestCase
 {
 public:
+    void setUp() override { AttributeArray::clearRegistry(); }
+    void tearDown() override { AttributeArray::clearRegistry(); }
+
     CPPUNIT_TEST_SUITE(TestAttributeArray);
     CPPUNIT_TEST(testFixedPointConversion);
     CPPUNIT_TEST(testRegistry);
@@ -1120,7 +1123,7 @@ TestAttributeArray::testDelayedLoad()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#if _MSC_VER
+#ifdef _MSC_VER
     if (tempDir.empty()) {
         char tempDirBuffer[MAX_PATH+1];
         int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
