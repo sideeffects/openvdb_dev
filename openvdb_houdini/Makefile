@@ -497,7 +497,9 @@ else
 HCUSTOM_LIBDEPS := -L . -l $(LIBHOUDINI_IMPORT) -L $(OPENVDB_LIB_DIR) -l $(OPENVDB_LIB)
 endif
 
+ifdef LINUX
 houdini/GR_PrimVDBPoints.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniAPPS3
+endif
 
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
