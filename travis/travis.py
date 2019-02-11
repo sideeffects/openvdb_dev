@@ -28,10 +28,12 @@
 #
 # Author: Dan Bailey
 
-import mechanize
+import requests
 import sys
 import re
-import exceptions
+import shutil
+from sidefx_api import service
+
 
 # this argument is for the major.minor version of Houdini to download (such as 15.0, 15.5, 16.0)
 version = sys.argv[1]
@@ -39,44 +41,28 @@ version = sys.argv[1]
 if not re.match('[0-9][0-9]\.[0-9]$', version):
     raise IOError('Invalid Houdini Version "%s", expecting in the form "major.minor" such as "16.0"' % version)
 
-br = mechanize.Browser()
-br.set_handle_robots(False)
+sidefx_client_id = sys.argv[2]
+sidefx_secret_key = sys.argv[3]
 
-# login to sidefx.com as openvdb
-br.open('https://www.sidefx.com/login/?next=/download/daily-builds')
-br.select_form(nr=0)
-br.form['username'] = 'openvdb'
-br.form['password'] = 'L3_M2f2W'
-br.submit()
+sidefx_service = service(
+    access_token_url='https://www.sidefx.com/oauth2/application_token',
+    client_id=sidefx_client_id,
+    client_secret_key=sidefx_secret_key,
+    endpoint_url='https://www.sidefx.com/api/',
+)
 
-# retrieve download id
-br.open('http://www.sidefx.com/download/daily-builds/')
 
-for link in br.links():
-    if not link.url.startswith('/download/download-houdini'):
-        continue
-    if link.text.startswith('houdini-%s' % version) and 'linux_x86_64' in link.text:
-        response = br.follow_link(text=link.text, nr=0)
-        url = response.geturl()
-        id = url.split('/download-houdini/')[-1]
-        break
+release_list = service.download.get_daily_builds_list(
+    product='houdini', version=version, platform='linux')
+latest_release = service.download.get_daily_builds_download(
+    product='houdini', version=version, build=release_list[0]['build'], platform='linux')
 
-# accept eula terms
-#url = 'https://www.sidefx.com/download/eula/accept/?next=/download/download-houdini/%sget/' % id
-#br.open(url)
-#br.select_form(nr=0)
-#br.form.find_control('terms').items[1].selected=True
-#br.submit()
-
-# download houdini tarball in 50MB chunks
-url = 'https://www.sidefx.com/download/download-houdini/%sget/' % id
-response = br.open(url)
-mb = 1024*1024
-chunk = 50
-size = 0
-file = open('hou.tar.gz', 'wb')
-for bytes in iter((lambda: response.read(chunk*mb)), ''):
-    size += 50
-    print 'Read: %sMB' % size
-    file.write(bytes)
-file.close()
+# Download the file
+local_filename = latest_release['filename']
+r = requests.get(latest_release['download_url'], stream=True)
+if r.status_code == 200:
+    with open(local_filename, 'wb') as f:
+        r.raw.decode_content = True
+        shutil.copyfileobj(r.raw, f)
+else:
+    raise Exception('Error downloading file!')
