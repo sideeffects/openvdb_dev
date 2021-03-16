@@ -7,19 +7,21 @@ on:
       - '**'
     paths-ignore:
       - 'CHANGES'
-      - 'openvdb/doc/**'
+      - 'doc/**'
       - 'openvdb_maya/**'
+      - 'openvdb_houdini/**'
       - 'openvdb_ax/**'
-      - '**/*.md'
+      - '**.md'
   pull_request:
     branches:
       - '**'
     paths-ignore:
       - 'CHANGES'
-      - 'openvdb/doc/**'
+      - 'doc/**'
       - 'openvdb_maya/**'
+      - 'openvdb_houdini/**'
       - 'openvdb_ax/**'
-      - '**/*.md'
+      - '**.md'
   schedule:
     # run this workflow every day at 7am UTC
     - cron:  '0 7 * * *'
@@ -54,43 +56,6 @@ jobs:
         ./ci/test.sh
         ./ci/test_install.sh
 
-  linux-vfx-houdini:
-    runs-on: ubuntu-16.04
-    name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
-    container:
-      image: aswf/ci-base:${{ matrix.config.image }}
-    env:
-      CXX: ${{ matrix.config.cxx }}
-    strategy:
-      matrix:
-        config:
-          # disable dependency version checks for H18.0 as it ships with OpenEXR 2.2,
-          # not OpenEXR 2.3 as stated in the VFX Reference Platform 2019
-          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'ON' }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF', disable_checks: 'OFF' }
-          - { cxx: g++,     image: '2020', hou: '18_5', build: 'Release', extras: 'OFF', disable_checks: 'OFF' }
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@v1
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
-    - name: fetch_houdini
-      uses: actions/cache@v2
-      with:
-        path: hou
-        key: vdb1-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini${{ matrix.config.hou }}-
-    - name: validate_houdini
-      if: github.repository_owner == 'AcademySoftwareFoundation'
-      run: test -f "hou/hou.tar.gz"
-    - name: houdini
-      run: ./ci/install_houdini.sh
-    - name: build
-      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }} -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}
-    - name: test
-      run: ./ci/test.sh
-
   testabi8lite:
     runs-on: ubuntu-16.04
     env:
@@ -103,6 +68,21 @@ jobs:
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh Release 8 OFF None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
+    - name: test
+      run: ./ci/test.sh
+
+  testabi8half:
+    runs-on: ubuntu-16.04
+    env:
+      CXX: clang++
+    container:
+      image: aswf/ci-openvdb:2021
+    steps:
+    - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: build
+      run: ./ci/build.sh Release 8 OFF None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON -DUSE_IMATH_HALF=ON
     - name: test
       run: ./ci/test.sh
 
@@ -134,7 +114,7 @@ jobs:
     - name: install_gtest
       run: sudo apt-get -q install -y libgtest-dev
     - name: build
-      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
       run: ./ci/test.sh
 
@@ -151,7 +131,7 @@ jobs:
     - name: install_gtest
       run: sudo apt-get -q install -y libgtest-dev
     - name: build
-      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
       run: ./ci/test.sh
 

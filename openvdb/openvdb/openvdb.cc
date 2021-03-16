@@ -8,23 +8,19 @@
 //#endif
 #include "tools/PointIndexGrid.h"
 #include "util/logging.h"
+#include <tbb/atomic.h>
 #include <tbb/mutex.h>
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
 
-#if OPENVDB_ABI_VERSION_NUMBER < 5
-    #error ABI <= 4 is no longer supported
+#if OPENVDB_ABI_VERSION_NUMBER < 6
+    #error ABI <= 5 is no longer supported
 #endif
 
 // If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue an error
 // directive. This can be optionally suppressed by setting the CMake option
 // OPENVDB_USE_DEPRECATED_ABI_<VERSION>=ON.
-#ifndef OPENVDB_USE_DEPRECATED_ABI_5
-    #if OPENVDB_ABI_VERSION_NUMBER == 5
-        #error ABI = 5 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_5 suppresses this error
-    #endif
-#endif
 #ifndef OPENVDB_USE_DEPRECATED_ABI_6
     #if OPENVDB_ABI_VERSION_NUMBER == 6
         #error ABI = 6 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_6 suppresses this error
@@ -41,14 +37,15 @@ typedef Mutex::scoped_lock Lock;
 namespace {
 // Declare this at file scope to ensure thread-safe initialization.
 Mutex sInitMutex;
-bool sIsInitialized = false;
+tbb::atomic<bool> sIsInitialized{false};
 }
 
 void
 initialize()
 {
+    if (sIsInitialized.load<tbb::memory_semantics::acquire>()) return;
     Lock lock(sInitMutex);
-    if (sIsInitialized) return;
+    if (sIsInitialized.load<tbb::memory_semantics::acquire>()) return; // Double-checked lock
 
     logging::initialize();
 
@@ -123,7 +120,7 @@ initialize()
 __pragma(warning(disable:1711))
 #endif
 
-    sIsInitialized = true;
+    sIsInitialized.store<tbb::memory_semantics::release>(true);
 
 #ifdef __ICC
 __pragma(warning(default:1711))
@@ -135,14 +132,13 @@ void
 uninitialize()
 {
     Lock lock(sInitMutex);
-
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.
 // This assignment is mutex-protected and therefore thread-safe.
 __pragma(warning(disable:1711))
 #endif
 
-    sIsInitialized = false;
+    sIsInitialized.store<tbb::memory_semantics::full_fence>(false); // What memory order? We can't have anything below reordered above this, right?
 
 #ifdef __ICC
 __pragma(warning(default:1711))

@@ -10,10 +10,7 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
+include(GNUInstallDirs)
 
 ##########################################################################
 
@@ -56,6 +53,7 @@ endif()
 
 set(UNITTEST_SOURCE_FILES
   main.cc
+  TestActivate.cc
   TestAttributeArray.cc
   TestAttributeArrayString.cc
   TestAttributeGroup.cc
@@ -75,6 +73,7 @@ set(UNITTEST_SOURCE_FILES
   TestExceptions.cc
   TestFastSweeping.cc
   TestFile.cc
+  TestFilter.cc
   TestFindActiveValues.cc
   TestFloatMetadata.cc
   TestGradient.cc
@@ -108,6 +107,7 @@ set(UNITTEST_SOURCE_FILES
   TestMetadata.cc
   TestMetadataIO.cc
   TestMetaMap.cc
+  TestMorphology.cc
   TestMultiResGrid.cc
   TestName.cc
   TestNodeIterator.cc
@@ -192,7 +192,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Gtest_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()

@@ -59,8 +59,8 @@ This will define the following variables:
   True if the OpenVDB Library has been built with zlib support
 ``OpenVDB_USES_LOG4CPLUS``
   True if the OpenVDB Library has been built with log4cplus support
-``OpenVDB_USES_EXR``
-  True if the OpenVDB Library has been built with openexr support
+``OpenVDB_USES_IMATH_HALF``
+  True if the OpenVDB Library has been built with Imath half support
 ``OpenVDB_ABI``
   Set if this module was able to determine the ABI number the located
   OpenVDB Library was built against. Unset otherwise.
@@ -107,10 +107,6 @@ may be provided to tell this module where to look.
 cmake_minimum_required(VERSION 3.12)
 include(GNUInstallDirs)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 
 # Include utility functions for version information
 include(${CMAKE_CURRENT_LIST_DIR}/OpenVDBUtils.cmake)
@@ -362,16 +358,15 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
       PATH_SUFFIXES ${OPENVDB_PYTHON_PATH_SUFFIXES}
     )
     set(CMAKE_FIND_LIBRARY_PREFIXES ${_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_PREFIXES})
-  elseif(${COMPONENT} STREQUAL "openvdb" OR
-         ${COMPONENT} STREQUAL "openvdb_houdini")
+  elseif(${COMPONENT} STREQUAL "openvdb_je")
+    # alias to the result of openvdb which should be handled first
+    set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
+  else()
     find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
       ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
       PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
       PATH_SUFFIXES ${OPENVDB_LIB_PATH_SUFFIXES}
     )
-  elseif(${COMPONENT} STREQUAL "openvdb_je")
-    # alias to the result of openvdb which should be handled first
-    set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
   endif()
 
   list(APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY})
@@ -448,7 +443,6 @@ endif()
 
 # Add standard dependencies
 
-find_package(IlmBase REQUIRED COMPONENTS Half)
 find_package(TBB REQUIRED COMPONENTS tbb)
 find_package(ZLIB REQUIRED)
 
@@ -511,7 +505,6 @@ if(openvdb_ax IN_LIST OpenVDB_FIND_COMPONENTS)
   if(NOT OpenVDB_FIND_QUIET)
     message(STATUS "Found LLVM: ${LLVM_DIR} (found version \"${LLVM_PACKAGE_VERSION}\")")
   endif()
-  find_package(Boost REQUIRED COMPONENTS random)
 endif()
 
 # As the way we resolve optional libraries relies on library file names, use
@@ -520,7 +513,7 @@ endif()
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
-set(OpenVDB_USES_EXR ${USE_EXR})
+set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
 set(OpenVDB_DEFINITIONS)
 
 if(WIN32)
@@ -578,9 +571,9 @@ else()
       set(OpenVDB_USES_LOG4CPLUS ON)
     endif()
 
-    string(FIND ${PREREQUISITE} "IlmImf" _HAS_DEP)
+    string(FIND ${PREREQUISITE} "Half" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_EXR ON)
+      set(OpenVDB_USES_IMATH_HALF ON)
     endif()
   endforeach()
 
@@ -599,49 +592,38 @@ if(OpenVDB_USES_LOG4CPLUS)
   find_package(Log4cplus REQUIRED)
 endif()
 
-if(OpenVDB_USES_EXR)
-  find_package(IlmBase REQUIRED)
-  find_package(OpenEXR REQUIRED)
+if(OpenVDB_USES_IMATH_HALF)
+  find_package(IlmBase REQUIRED COMPONENTS Half)
+  if(WIN32)
+    # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
+    #       used in PlatformConfig.h to configure EXR exports. Once this file
+    #       is completely removed, this define can be too
+    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
+    endif()
+  endif()
 endif()
 
 if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
-if(WIN32)
-  # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
-  #       used in PlatformConfig.h to configure EXR exports. Once this file
-  #       is completely removed, this define can be too
-  get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
-  if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-    list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
-  endif()
-endif()
-
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
-# users chosen namespaced headers are correctly prioritized. Otherwise other
-# include paths from shared installs (including houdini) may pull in the wrong
-# headers
+# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
+# namespaced headers are correctly prioritized. Otherwise other include paths
+# from shared installs (including houdini) may pull in the wrong headers
 
 set(_OPENVDB_VISIBLE_DEPENDENCIES
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
+
+if(OpenVDB_USES_IMATH_HALF)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES IlmBase::Half)
+endif()
 
 if(OpenVDB_ABI)
   list(APPEND OpenVDB_DEFINITIONS OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
-endif()
-
-if(OpenVDB_USES_EXR)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
-    OpenEXR::IlmImf
-  )
-  list(APPEND OpenVDB_DEFINITIONS OPENVDB_TOOLS_RAYTRACER_USE_EXR)
 endif()
 
 if(OpenVDB_USES_LOG4CPLUS)
@@ -778,7 +760,7 @@ if(OpenVDB_openvdb_ax_LIBRARY)
       IMPORTED_LOCATION "${OpenVDB_openvdb_ax_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_openvdb_ax_INCLUDE_DIR}"
       INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}"
-      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Boost::random;${LLVM_LIBS}"
+      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;${LLVM_LIBS}"
       INTERFACE_COMPILE_FEATURES cxx_std_14
     )
   endif()
