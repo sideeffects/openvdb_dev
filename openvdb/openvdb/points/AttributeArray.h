@@ -1839,6 +1839,7 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
     if (!delayLoad) {
         std::unique_ptr<char[]> buffer = mPageHandle->read();
         mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
+        mPageHandle.reset();
     }
 
     // clear page state
