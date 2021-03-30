@@ -12,8 +12,8 @@
 #include <openvdb/util/logging.h>
 #include <tbb/concurrent_hash_map.h>
 #include <tbb/task.h>
-#include <tbb/tbb_thread.h> // for tbb::this_tbb_thread::sleep()
 #include <tbb/tick_count.h>
+#include <thread>
 #include <algorithm> // for std::max()
 #include <atomic>
 #include <iostream>
@@ -163,7 +163,7 @@ struct Queue::Impl
     {
         tbb::tick_count start = tbb::tick_count::now();
         while (!canEnqueue()) {
-            tbb::this_tbb_thread::sleep(tbb::tick_count::interval_t(0.5/*sec*/));
+            std::this_thread::sleep(tbb::tick_count::interval_t(0.5/*sec*/));
             if ((tbb::tick_count::now() - start).seconds() > double(mTimeout)) {
                 OPENVDB_THROW(RuntimeError,
                     "unable to queue I/O task; " << mTimeout << "-second time limit expired");
