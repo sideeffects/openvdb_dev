@@ -301,7 +301,7 @@ public:
     }
     /// @brief Splitting constructor for use in TBB ranges
     /// @note The other bounding box is assumed to be divisible.
-    CoordBBox(CoordBBox& other, const tbb::detail::split&): mMin(other.mMin), mMax(other.mMax)
+    CoordBBox(CoordBBox& other, const tbb::split&): mMin(other.mMin), mMax(other.mMax)
     {
         assert(this->is_divisible());
         const size_t n = this->maxExtent();

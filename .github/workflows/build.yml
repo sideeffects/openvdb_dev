@@ -177,6 +177,32 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
+  testtbb2021:
+    runs-on: ubuntu-20.04
+    # @note  We only use the oneapi core "tool" container to add the appropriate
+    #  apt repo public keys for the intel tbb package. The intel/oneapi or
+    #  intel/oneapi-basekit containers are ~5GB to download and ~25gb to install
+    #  and are bigger than the available space on our GHA slots. We only need
+    #  tbb.
+    # Provided from https://github.com/intel/oneapi-container
+    # EULA: https://github.com/intel/oneapi-containers/blob/master/licensing/EULA.txt
+    #  @todo ax, binaries, tests
+    container: intel/oneapi:os-tools-ubuntu18.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: update_apt
+      run: apt-get update -y
+    - name: install_tbb
+      run: apt-get -q install -y intel-oneapi-tbb-devel
+    - name: install_boost
+      run: apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev
+    - name: build
+      run: ./ci/build.sh Release 8 OFF None "core" -DOPENVDB_CXX_STRICT=ON -DCMAKE_INSTALL_PREFIX=`pwd` \
+        -DTBB_ROOT="/opt/intel/oneapi/tbb/2021.2.0" \
+        -DTBB_LIBRARYDIR="/opt/intel/oneapi/tbb/2021.2.0/lib/intel64/gcc4.8"
+    - name: test
+      run: ./ci/test.sh
+
   testmacos1015:
     runs-on: macos-10.15
     env:

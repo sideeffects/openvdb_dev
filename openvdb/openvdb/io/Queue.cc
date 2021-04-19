@@ -19,6 +19,7 @@
 #include <iostream>
 #include <map>
 #include <mutex>
+#include <chrono>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -161,10 +162,12 @@ struct Queue::Impl
 
     void enqueue(Task& task)
     {
-        tbb::tick_count start = tbb::tick_count::now();
+        auto start = std::chrono::steady_clock::now();
         while (!canEnqueue()) {
-            std::this_thread::sleep(tbb::tick_count::interval_t(0.5/*sec*/));
-            if ((tbb::tick_count::now() - start).seconds() > double(mTimeout)) {
+            std::this_thread::sleep_for(/*0.5s*/std::chrono::milliseconds(500));
+            auto duration = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - start);
+            if (Index32(duration.count()) > mTimeout) {
                 OPENVDB_THROW(RuntimeError,
                     "unable to queue I/O task; " << mTimeout << "-second time limit expired");
             }
@@ -204,7 +207,7 @@ Queue::~Queue()
     /// (e.g., by keeping a static registry of queues that also dispatches
     /// or blocks notifications)?
     while (mImpl->mNumTasks > 0) {
-        tbb::this_tbb_thread::sleep(tbb::tick_count::interval_t(0.5/*sec*/));
+        std::this_thread::sleep_for(/*0.5s*/std::chrono::milliseconds(500));
     }
 }
 
