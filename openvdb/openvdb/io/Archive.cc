@@ -1002,7 +1002,7 @@ Archive::readHeader(std::istream& is)
 
     // 6) Read the 16-byte (128-bit) uuid.
     boost::uuids::uuid oldUuid = mUuid;
-    if (mFileVersion >= OPENVDB_FILE_VERSION_BOOST_UUID) {
+    if (mFileVersion >= OPENVDB_FILE_VERSION_BO__OST_UUID) {
         // UUID is stored as an ASCII string.
         is >> mUuid;
     } else {
