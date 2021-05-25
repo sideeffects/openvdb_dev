@@ -79,6 +79,7 @@ else()
     TestClip.cc
     TestConjGradient.cc
     TestCoord.cc
+    TestCount.cc
     TestCpt.cc
     TestCurl.cc
     TestDelayedLoadMetadata.cc
@@ -187,7 +188,6 @@ add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
 if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
   list(APPEND OPENVDB_TEST_DEPENDENT_LIBS Blosc::blosc)
-  target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_BLOSC")
 endif()
 
 if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
@@ -205,7 +205,6 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
     unset(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
   endif()
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
-  target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_ZLIB")
 endif()
 
 target_link_libraries(vdb_test
@@ -224,7 +223,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Gtest_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
+    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()

@@ -1,8 +1,6 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
-
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/TempFile.h>
@@ -10,6 +8,8 @@
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
+
+#include <gtest/gtest.h>
 
 #include <cmath>
 #include <cstdio> // for std::remove()
@@ -424,6 +424,15 @@ TEST_F(TestPointCount, testGroup)
 TEST_F(TestPointCount, testOffsets)
 {
     using namespace openvdb::math;
+
+    // empty tree
+    {
+        PointDataTree tree;
+        std::vector<Index64> offsets{ 10 };
+        Index64 total = pointOffsets(offsets, tree);
+        EXPECT_EQ(total, Index64(0));
+        EXPECT_TRUE(offsets.empty());
+    }
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));

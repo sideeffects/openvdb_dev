@@ -207,9 +207,9 @@ if(OPENVDB_ENABLE_RPATH)
     ${Tbb_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
   else()
-    list(APPEND ${OpenVDB_LIBRARY_DIRS})
+    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()
 
   list(REMOVE_DUPLICATES RPATHS)
@@ -254,6 +254,7 @@ set(OPENVDB_DSO_NAMES
   SOP_OpenVDB_From_Particles
   SOP_OpenVDB_From_Polygons
   SOP_OpenVDB_LOD
+  SOP_OpenVDB_Merge
   SOP_OpenVDB_Metadata
   SOP_OpenVDB_Morph_Level_Set
   SOP_OpenVDB_Noise
@@ -347,7 +348,7 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   if(OPENVDB_ENABLE_RPATH)
     set(RPATHS)
     if(OPENVDB_BUILD_CORE)
-      list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+      list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
     else()
       list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
     endif()
@@ -371,18 +372,19 @@ if(OPENVDB_BUILD_SOP_OpenVDB_AX)
   endif()
 endif()
 
-# This is only required for the OpenVDB Write SOP which enables a compression menu
-# option if blosc and zlib are supported.
-
-if(USE_BLOSC OR OpenVDB_USES_BLOSC)
-  if(TARGET SOP_OpenVDB_Write)
-    target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_BLOSC")
+# These defines are in Platform.h when building against 8.1 and later
+if(OpenVDB_VERSION VERSION_LESS 8.1.0)
+  # This is only required for the OpenVDB Write SOP which enables a compression menu
+  # option if blosc and zlib are supported.
+  if(USE_BLOSC OR OpenVDB_USES_BLOSC)
+    if(TARGET SOP_OpenVDB_Write)
+      target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_BLOSC")
+    endif()
   endif()
-endif()
-
-if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
-  if(TARGET SOP_OpenVDB_Write)
-    target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_ZLIB")
+  if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
+    if(TARGET SOP_OpenVDB_Write)
+      target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_ZLIB")
+    endif()
   endif()
 endif()
 
