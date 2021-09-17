@@ -163,16 +163,10 @@ struct Queue::Impl
         auto start = std::chrono::steady_clock::now();
         while (!canEnqueue()) {
             std::this_thread::sleep_for(/*0.5s*/std::chrono::milliseconds(500));
-<<<<<<< HEAD
-            auto duration = std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::steady_clock::now() - start);
-            if (Index32(duration.count()) > mTimeout) {
-=======
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - start);
             const double seconds = double(duration.count()) / 1000.0;
             if (seconds > double(mTimeout)) {
->>>>>>> upstream/master
                 OPENVDB_THROW(RuntimeError,
                     "unable to queue I/O task; " << mTimeout << "-second time limit expired");
             }
