@@ -144,6 +144,8 @@ divide(const T& a, const T& b)
 inline bool divide(bool a, bool /*b*/) { return a; }
 
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 enum CSGOperation { CSG_UNION, CSG_INTERSECTION, CSG_DIFFERENCE };
 
 template<typename TreeType, CSGOperation Operation>
@@ -596,13 +598,10 @@ struct GridOrTreeConstructor<Grid<TreeType> >
 
 ////////////////////////////////////////
 
-/// @cond COMPOSITE_INTERNAL
 /// List of pairs of leaf node pointers
 template <typename LeafT>
 using LeafPairList = std::vector<std::pair<LeafT*, LeafT*>>;
-/// @endcond
 
-/// @cond COMPOSITE_INTERNAL
 /// Transfers leaf nodes from a source tree into a
 /// desitnation tree, unless it already exists in the destination tree
 /// in which case pointers to both leaf nodes are added to a list for
@@ -626,9 +625,7 @@ inline void transferLeafNodes(TreeT &srcTree, TreeT &dstTree,
         }
     }
 }
-/// @endcond
 
-/// @cond COMPOSITE_INTERNAL
 /// Template specailization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
@@ -654,9 +651,7 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
         }
    });
 }
-/// @endcond
 
-/// @cond COMPOSITE_INTERNAL
 /// Template specailization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
@@ -678,7 +673,6 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT)
     });
 }
 
-/// @cond COMPOSITE_INTERNAL
 /// Template specailization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
@@ -709,9 +703,7 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
         }
     });
 }
-/// @endcond
 
-/// @cond COMPOSITE_INTERNAL
 /// Default functor for compActiveLeafVoxels
 template <typename TreeT>
 struct CopyOp
@@ -720,7 +712,6 @@ struct CopyOp
     CopyOp() = default;
     void operator()(ValueT& dst, const ValueT& src) const { dst = src; }
 };
-/// @endcond
 
 template <typename TreeT>
 inline void validateLevelSet(const TreeT& tree, const std::string& gridName = std::string(""))
@@ -742,6 +733,8 @@ inline void validateLevelSet(const TreeT& tree, const std::string& gridName = st
         OPENVDB_THROW(ValueError, ss.str());
     }
 }
+
+/// @endcond
 
 } // namespace composite
 

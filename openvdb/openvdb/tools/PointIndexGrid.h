@@ -16,6 +16,7 @@
 #ifndef OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 
+#include "openvdb/thread/Threading.h"
 #include "PointPartitioner.h"
 
 #include <openvdb/version.h>
@@ -337,6 +338,7 @@ private:
 
 // Internal operators and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_index_grid_internal {
 
@@ -355,7 +357,7 @@ struct ValidPartitioningOp
     void operator()(LeafT &leaf, size_t /*leafIndex*/) const
     {
         if ((*mHasChanged)) {
-            tbb::task::self().cancel_group_execution();
+            thread::cancelGroupExecution();
             return;
         }
 
@@ -911,6 +913,7 @@ pointIndexSearch(RangeDeque& rangeList, ConstAccessor& acc, const CoordBBox& bbo
 
 } // namespace point_index_grid_internal
 
+/// @endcond
 
 // PointIndexIterator implementation
 

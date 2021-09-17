@@ -114,7 +114,9 @@ endif()
 
 find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system)
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
-  if(${Boost_LIB_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
+  # The X.Y.Z boost version value isn't available until CMake 3.14
+  set(FULL_BOOST_VERSION "${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION}")
+  if(${FULL_BOOST_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
     message(DEPRECATION "Support for Boost versions < ${FUTURE_MINIMUM_BOOST_VERSION} "
       "is deprecated and will be removed.")
   endif()
@@ -437,6 +439,10 @@ set(OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
   util/Util.h
 )
 
+set(OPENVDB_LIBRARY_THREAD_INCLUDE_FILES
+  thread/Threading.h
+)
+
 # @todo CMake >= 3.12, use an object library to consolidate shared/static
 # builds. There are limitations with earlier versions of CMake when used with
 # imported targets.
@@ -502,7 +508,7 @@ if(OPENVDB_CORE_STATIC)
   set_target_properties(openvdb_static
     PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME})
 
-  if(WIN32)
+  if(MSVC)
     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
       # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
       # also add it explicitly as a compile option
@@ -553,7 +559,7 @@ if(OPENVDB_CORE_SHARED)
     )
   endif()
 
-  if(WIN32)
+  if(MSVC)
     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
       # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
       # also add it explicitly as a compile option
@@ -592,3 +598,4 @@ install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${OPENVDB_INST
 install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/tools)
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/util)
+install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/thread)
