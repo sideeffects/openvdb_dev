@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBPython LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -37,6 +37,16 @@ if(NOT OPENVDB_BUILD_CORE)
   set(OPENVDB_LIB OpenVDB::openvdb)
 else()
   set(OPENVDB_LIB openvdb)
+endif()
+
+if(USE_AX)
+  # Link the python module against openvdb_ax
+  if(NOT OPENVDB_BUILD_AX)
+    find_package(OpenVDB REQUIRED openvdb_ax)
+    set(OPENVDB_AX_LIB OpenVDB::openvdb_ax)
+  else()
+    set(OPENVDB_AX_LIB openvdb_ax)
+  endif()
 endif()
 
 # Small function which mimics basic output (bar components) of
@@ -69,48 +79,35 @@ endfunction()
 # To ensure consistent versions between components Interpreter, Compiler,
 # Development and NumPy, specify all components at the same time when using
 # FindPython.
-# @note  the Interpreter component is only required for the python test.
 # @note  the Python::Module target should be used over the Python::Python
 #   target but this was only added in CMake 3.15. See:
 #      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
 set(OPENVDB_PYTHON_DEPS)
 set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
-
-if(OPENVDB_BUILD_PYTHON_UNITTESTS)
-  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
+if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
+    list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
 endif()
 
-if(${CMAKE_VERSION} VERSION_LESS 3.14)
-  find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-  OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
+find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
+OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
 
-  if(USE_NUMPY)
-    # Note: This uses our custom backport in cmake/backports
-    find_package(NumPy ${MINIMUM_NUMPY_VERSION} REQUIRED)
-    list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
-  endif()
-else()
-  find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-  OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
-
-  if(USE_NUMPY)
-    find_package(Python QUIET COMPONENTS NumPy)
-    if(NOT TARGET Python::NumPy)
-        message(FATAL_ERROR "Could NOT find NumPy (Required is at least version "
-          "\"${MINIMUM_NUMPY_VERSION}\")"
-        )
-    elseif(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
-      message(FATAL_ERROR "Could NOT find NumPy: Found unsuitable version \"${Python_NumPy_VERSION}\""
-        "but required is at least \"${MINIMUM_NUMPY_VERSION}\" (found ${Python_NumPy_INCLUDE_DIRS})"
-      )
-    else()
-      message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
-        "version \"${Python_NumPy_VERSION}\", minimum required is "
+if(USE_NUMPY)
+  find_package(Python QUIET COMPONENTS NumPy)
+  if(NOT TARGET Python::NumPy)
+      message(FATAL_ERROR "Could NOT find NumPy (Required is at least version "
         "\"${MINIMUM_NUMPY_VERSION}\")"
       )
-    endif()
-    list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
+  elseif(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
+    message(FATAL_ERROR "Could NOT find NumPy: Found unsuitable version \"${Python_NumPy_VERSION}\""
+      "but required is at least \"${MINIMUM_NUMPY_VERSION}\" (found ${Python_NumPy_INCLUDE_DIRS})"
+    )
+  else()
+    message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
+      "version \"${Python_NumPy_VERSION}\", minimum required is "
+      "\"${MINIMUM_NUMPY_VERSION}\")"
+    )
   endif()
+  list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
 endif()
 
 if(USE_NUMPY)
@@ -215,8 +212,9 @@ set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
 )
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
+  get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
   set(PYOPENVDB_INSTALL_DIRECTORY
-    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}
+    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
     CACHE STRING "The directory to install the pyopenvdb.so module."
   )
 endif()
@@ -259,29 +257,9 @@ endif()
 if(USE_NUMPY)
   target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
 endif()
-
-if(OPENVDB_ENABLE_RPATH)
-  # @todo There is probably a better way to do this for imported targets
-  set(RPATHS "")
-  list(APPEND RPATHS
-    ${Boost_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
-    ${Log4cplus_LIBRARY_DIRS}
-    ${Blosc_LIBRARY_DIRS}
-    ${Tbb_LIBRARY_DIRS}
-    ${Python_LIBRARY_DIRS}
-  )
-  if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-  else()
-    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-  endif()
-
-  list(REMOVE_DUPLICATES RPATHS)
-  set_target_properties(pyopenvdb
-    PROPERTIES INSTALL_RPATH "${RPATHS}"
-  )
-  unset(RPATHS)
+if(USE_AX)
+  target_link_libraries(pyopenvdb PUBLIC ${OPENVDB_AX_LIB})
+  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_AX")
 endif()
 
 set(PYTHON_PUBLIC_INCLUDE_NAMES
