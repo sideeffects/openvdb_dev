@@ -144,7 +144,7 @@ option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)."
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
 option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes and methods against a
 pre-defined list of OpenVDB trees. This makes the core library larger and slower to compile, but speeds up
-the compilation of all dependent code by bypassing the expensive template instantation." ON)
+the compilation of all dependent code by bypassing the expensive template instantation." OFF)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
