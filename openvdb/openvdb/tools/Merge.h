@@ -996,7 +996,7 @@ CsgUnionOrIntersectionOp<TreeT, Union>::background() const
 
 
 template <typename TreeT, bool PruneCancelledTiles>
-bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
+bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(RootT& root, size_t) const
 {
     // store the background values
     if (!mBackground)       mBackground = &root.background();
@@ -1083,7 +1083,7 @@ bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
 
 template<typename TreeT, bool PruneCancelledTiles>
 template<typename NodeT>
-bool CsgDifferenceOp<TreeT>::operator()(NodeT& node, size_t) const
+bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(NodeT& node, size_t) const
 {
     using NonConstNodeT = typename std::remove_const<NodeT>::type;
 
@@ -1138,7 +1138,7 @@ bool CsgDifferenceOp<TreeT>::operator()(NodeT& node, size_t) const
 }
 
 template <typename TreeT, bool PruneCancelledTiles>
-bool CsgDifferenceOp<TreeT>::operator()(LeafT& leaf, size_t) const
+bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(LeafT& leaf, size_t) const
 {
     using LeafT = typename TreeT::LeafNodeType;
     using ValueT = typename LeafT::ValueType;
@@ -1173,7 +1173,7 @@ bool CsgDifferenceOp<TreeT>::operator()(LeafT& leaf, size_t) const
             leaf.setActiveState(i, mergeLeaf->isValueOn(i));
         }
     }
-    if (PruneCancelledTile && allequal) {
+    if (PruneCancelledTiles && allequal) {
         // If two diffed tiles have the same values, we know they
         // have both the same distances and gradients.  Thus they will
         // cancel out.
@@ -1184,8 +1184,8 @@ bool CsgDifferenceOp<TreeT>::operator()(LeafT& leaf, size_t) const
 }
 
 template <typename TreeT, bool PruneCancelledTiles>
-const typename CsgDifferenceOp<TreeT>::ValueT&
-CsgDifferenceOp<TreeT>::background() const
+const typename CsgDifferenceOp<TreeT, PruneCancelledTiles>::ValueT&
+CsgDifferenceOp<TreeT, PruneCancelledTiles>::background() const
 {
     // this operator is only intended to be used with foreachTopDown()
     assert(mBackground);
@@ -1193,8 +1193,8 @@ CsgDifferenceOp<TreeT>::background() const
 }
 
 template <typename TreeT, bool PruneCancelledTiles>
-const typename CsgDifferenceOp<TreeT>::ValueT&
-CsgDifferenceOp<TreeT>::otherBackground() const
+const typename CsgDifferenceOp<TreeT, PruneCancelledTiles>::ValueT&
+CsgDifferenceOp<TreeT, PruneCancelledTiles>::otherBackground() const
 {
     // this operator is only intended to be used with foreachTopDown()
     assert(mOtherBackground);
