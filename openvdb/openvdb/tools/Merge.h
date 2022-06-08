@@ -450,7 +450,7 @@ TreeToMerge<TreeT>::stealOrDeepCopyNode(const Coord& ijk)
             assert(this->hasMask());
             auto result = std::make_unique<NodeT>(*child);
             // prune mask tree
-            this->mask()->addTile(NodeT::LEVEL, ijk, false, false);
+            this->mask()->addTile(NodeT::LEVEL+1, ijk, false, false);
             return result;
         }
     }
@@ -1391,7 +1391,7 @@ bool SumMergeOp<TreeT>::operator()(NodeT& node, size_t) const
         const auto* mergeRoot = mergeTree.rootPtr();
         if (!mergeRoot)     continue;
 
-        const auto* mergeNode = mergeRoot->template probeConstNode<NonConstNodeT>(node.origin());
+        const auto* mergeNode = mergeTree.template probeConstNode<NonConstNodeT>(node.origin());
         if (mergeNode) {
             // merge node
 
@@ -1416,6 +1416,13 @@ bool SumMergeOp<TreeT>::operator()(NodeT& node, size_t) const
 
         } else {
             // merge tile or background value
+
+            if (mergeTree.hasMask()) {
+                // if not stealing, test the original tree and if the node exists there, it means it
+                // has been stolen so don't merge the tile value with this node
+                const ChildT* originalMergeNode = mergeRoot->template probeConstNode<ChildT>(node.origin());
+                if (originalMergeNode)  continue;
+            }
 
             ValueT mergeValue;
             const bool mergeActive = mergeRoot->probeValue(node.origin(), mergeValue);
@@ -1456,9 +1463,7 @@ bool SumMergeOp<TreeT>::operator()(LeafT& leaf, size_t) const
         const RootT* mergeRoot = mergeTree.rootPtr();
         if (!mergeRoot)     continue;
 
-        const RootChildT* mergeRootChild = mergeRoot->template probeConstNode<NonConstRootChildT>(ijk);
-        const LeafT* mergeLeaf = mergeRootChild ?
-            mergeRootChild->template probeConstNode<NonConstLeafT>(ijk) : nullptr;
+        const LeafT* mergeLeaf = mergeTree.template probeConstNode<NonConstLeafT>(ijk);
         if (mergeLeaf) {
             // merge leaf
 
@@ -1476,7 +1481,16 @@ bool SumMergeOp<TreeT>::operator()(LeafT& leaf, size_t) const
 
             leaf.getValueMask() |= mergeLeaf->getValueMask();
         } else {
-            // merge root tile or background value
+            // merge root tile or background value (as the merge leaf does not exist)
+
+            if (mergeTree.hasMask()) {
+                // if not stealing, test the original tree and if the leaf exists there, it means it
+                // has been stolen so don't merge the tile value with this leaf
+                const LeafT* originalMergeLeaf = mergeRoot->template probeConstNode<NonConstLeafT>(ijk);
+                if (originalMergeLeaf)  continue;
+            }
+
+            const RootChildT* mergeRootChild = mergeRoot->template probeConstNode<NonConstRootChildT>(ijk);
 
             ValueT mergeValue;
             bool mergeActive = mergeRootChild ?
