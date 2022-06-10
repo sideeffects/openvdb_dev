@@ -14,6 +14,7 @@
 
 #include "CustomData.h"
 #include "AttributeRegistry.h"
+#include "AttributeBindings.h"
 
 #include <openvdb/openvdb.h>
 #include <openvdb/version.h>
@@ -66,7 +67,7 @@ class Compiler;
 ///       @sa setGrainSize
 ///
 ///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
-class PointExecutable
+class OPENVDB_AX_API PointExecutable
 {
 public:
     using Ptr = std::shared_ptr<PointExecutable>;
@@ -121,6 +122,21 @@ public:
     /// @return  The current grain size
     size_t getGrainSize() const;
 
+    /// @brief  Set attribute bindings.
+    /// @param bindings A map of attribute bindings to expected names on
+    ///   the geometry to be executed over. By default the AX attributes will be
+    ///   bound to point attributes of the same name. Supplying bindings
+    ///   for a subset of the attributes will leave the others unchanged.
+    ///   AX attributes can only bind to a single point attribute and vice versa.
+    ///   However, in a single set call these can be swapped e.g. a -> b and b -> a.
+    ///   When bindings are overriden through subsequent calls to this function,
+    ///   any dangling point attributes will be automatically bound by name.
+    ///   To reset these bindings call get function and create a target set of bindings
+    ///   for each attribute of name -> name.
+    void setAttributeBindings(const AttributeBindings& bindings);
+    /// @return  The current attribute bindings map
+    const AttributeBindings& getAttributeBindings() const;
+
     ////////////////////////////////////////////////////////
 
     // foward declaration of settings for this executable
@@ -129,6 +145,9 @@ public:
 private:
     friend class Compiler;
     friend class ::TestPointExecutable;
+
+    /// @brief  Private method used in the unit tests
+    bool usesAcceleratedKernel(const points::PointDataTree& tree) const;
 
     /// @brief Constructor, expected to be invoked by the compiler. Should not
     ///   be invoked directly.

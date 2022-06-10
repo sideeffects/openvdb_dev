@@ -161,8 +161,8 @@ typedef unsigned long long uint64_t;
 
 #endif // __CUDACC_RTC__
 
-#ifdef __CUDACC__
-// Only define __hostdev__ when using NVIDIA CUDA compiler
+#if defined(__CUDACC__) || defined(__HIP__)
+// Only define __hostdev__ when using NVIDIA CUDA or HIP compiler
 #define __hostdev__ __host__ __device__
 #else
 #define __hostdev__
@@ -611,7 +611,7 @@ struct Delta<double>
 /// Maximum floating-point values
 template<typename T>
 struct Maximum;
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__) || defined(__HIP__)
 template<>
 struct Maximum<int>
 {
@@ -1176,10 +1176,10 @@ using Vec3f = Vec3<float>;
 using Vec3i = Vec3<int>;
 
 /// @brief Return a single precision floating-point vector of this coordinate
-Vec3f Coord::asVec3s() const { return Vec3f(float(mVec[0]), float(mVec[1]), float(mVec[2])); }
+__hostdev__ inline Vec3f Coord::asVec3s() const { return Vec3f(float(mVec[0]), float(mVec[1]), float(mVec[2])); }
 
 /// @brief Return a double precision floating-point vector of this coordinate
-Vec3d Coord::asVec3d() const { return Vec3d(double(mVec[0]), double(mVec[1]), double(mVec[2])); }
+__hostdev__ inline Vec3d Coord::asVec3d() const { return Vec3d(double(mVec[0]), double(mVec[1]), double(mVec[2])); }
 
 // ----------------------------> Vec4 <--------------------------------------
 
@@ -1773,7 +1773,8 @@ __hostdev__ static inline uint32_t FindHighestOn(uint64_t v)
 NANOVDB_HOSTDEV_DISABLE_WARNING
 __hostdev__ inline uint32_t CountOn(uint64_t v)
 {
-#if defined(_MSC_VER) && defined(_M_X64)
+// __popcnt* intrinsic support was added in VS 2019 16.8
+#if defined(_MSC_VER) && defined(_M_X64) && (_MSC_VER >= 1928)
     v = __popcnt64(v);
 #elif (defined(__GNUC__) || defined(__clang__))
     v = __builtin_popcountll(v);
@@ -2042,7 +2043,7 @@ struct Map
 }; // Map
 
 template<typename Mat4T>
-void Map::set(const Mat4T& mat, const Mat4T& invMat, double taper)
+__hostdev__ void Map::set(const Mat4T& mat, const Mat4T& invMat, double taper)
 {
     float * mf = mMatF, *vf = mVecF;
     float*  mif = mInvMatF;
@@ -2486,7 +2487,7 @@ private:
 }; // Class Grid
 
 template<typename TreeT>
-int Grid<TreeT>::findBlindDataForSemantic(GridBlindDataSemantic semantic) const
+__hostdev__ int Grid<TreeT>::findBlindDataForSemantic(GridBlindDataSemantic semantic) const
 {
     for (uint32_t i = 0, n = this->blindDataCount(); i < n; ++i)
         if (this->blindMetaData(i).mSemantic == semantic)
@@ -2671,7 +2672,7 @@ private:
 }; // Tree class
 
 template<typename RootT>
-void Tree<RootT>::extrema(ValueType& min, ValueType& max) const
+__hostdev__ void Tree<RootT>::extrema(ValueType& min, ValueType& max) const
 {
     min = this->root().minimum();
     max = this->root().maximum();
@@ -3880,7 +3881,7 @@ private:
 }; // LeafNode class
 
 template<typename ValueT, typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
-inline void LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
+__hostdev__ inline void LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
 {
     static_assert(LOG2DIM == 3, "LeafNode::updateBBox: only supports LOGDIM = 3!");
     if (!this->isActive()) return;

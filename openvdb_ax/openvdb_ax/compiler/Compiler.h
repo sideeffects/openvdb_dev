@@ -46,7 +46,7 @@ class FunctionRegistry;
 /// @brief  The compiler class.  This holds an llvm context and set of compiler
 ///   options, and constructs executable objects (e.g. PointExecutable or
 ///   VolumeExecutable) from a syntax tree or snippet of code.
-class Compiler
+class OPENVDB_AX_API Compiler
 {
 public:
 
@@ -120,14 +120,16 @@ public:
             [&errors] (const std::string& error) {
                 errors.emplace_back(error + "\n");
             },
-            // ignore warnings
-            [] (const std::string&) {}
+            [] (const std::string&) {} // ignore warnings
         );
         const ast::Tree::ConstPtr syntaxTree = ast::parse(code.c_str(), logger);
-        typename ExecutableT::Ptr exe;
-        if (syntaxTree) {
-            exe = this->compile<ExecutableT>(*syntaxTree, logger, data);
+        if (!errors.empty()) {
+            std::ostringstream os;
+            for (const auto& e : errors) os << e << "\n";
+            OPENVDB_THROW(AXSyntaxError, os.str());
         }
+        assert(syntaxTree);
+        typename ExecutableT::Ptr exe = this->compile<ExecutableT>(*syntaxTree, logger, data);
         if (!errors.empty()) {
             std::ostringstream os;
             for (const auto& e : errors) os << e << "\n";
@@ -153,8 +155,7 @@ public:
             [&errors] (const std::string& error) {
                 errors.emplace_back(error + "\n");
             },
-            // ignore warnings
-            [] (const std::string&) {}
+            [] (const std::string&) {} // ignore warnings
         );
         auto exe = compile<ExecutableT>(syntaxTree, logger, data);
         if (!errors.empty()) {

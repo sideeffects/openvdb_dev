@@ -3,7 +3,6 @@
 
 #include "ax.h"
 #include "ast/AST.h"
-#include "compiler/Logger.h"
 #include "compiler/Compiler.h"
 #include "compiler/PointExecutable.h"
 #include "compiler/VolumeExecutable.h"
@@ -25,25 +24,21 @@ namespace ax {
 /// @note Implementation for initialize, isInitialized and uninitialized
 ///       reamins in compiler/Compiler.cc
 
-void run(const char* ax, openvdb::GridBase& grid)
+void run(const char* ax, openvdb::GridBase& grid, const AttributeBindings& bindings)
 {
-    // Construct a logger that will output errors to cerr and suppress warnings
-    openvdb::ax::Logger logger;
     // Construct a generic compiler
     openvdb::ax::Compiler compiler;
-    // Parse the provided code and produce an abstract syntax tree
-    // @note  Throws with parser errors if invalid. Parsable code does not
-    //        necessarily equate to compilable code
-    const openvdb::ax::ast::Tree::ConstPtr
-        ast = openvdb::ax::ast::parse(ax, logger);
-    if (!ast) return;
 
     if (grid.isType<points::PointDataGrid>()) {
         // Compile for Point support and produce an executable
         // @note  Throws compiler errors on invalid code. On success, returns
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::PointExecutable::Ptr exe =
-            compiler.compile<openvdb::ax::PointExecutable>(*ast, logger);
+            compiler.compile<openvdb::ax::PointExecutable>(ax);
+        assert(exe);
+
+        //Set the attribute bindings
+        exe->setAttributeBindings(bindings);
         // Execute on the provided points
         // @note  Throws on invalid point inputs such as mismatching types
         exe->execute(static_cast<points::PointDataGrid&>(grid));
@@ -53,14 +48,18 @@ void run(const char* ax, openvdb::GridBase& grid)
         // @note  Throws compiler errors on invalid code. On success, returns
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::VolumeExecutable::Ptr exe =
-            compiler.compile<openvdb::ax::VolumeExecutable>(*ast, logger);
+            compiler.compile<openvdb::ax::VolumeExecutable>(ax);
+        assert(exe);
+
+        // Set the attribute bindings
+        exe->setAttributeBindings(bindings);
         // Execute on the provided numerical grid
         // @note  Throws on invalid grid inputs such as mismatching types
         exe->execute(grid);
     }
 }
 
-void run(const char* ax, openvdb::GridPtrVec& grids)
+void run(const char* ax, openvdb::GridPtrVec& grids, const AttributeBindings& bindings)
 {
     if (grids.empty()) return;
     // Check the type of all grids. If they are all points, run for point data.
@@ -73,23 +72,19 @@ void run(const char* ax, openvdb::GridPtrVec& grids)
                 "a single invocation of ax::run()");
         }
     }
-    // Construct a logger that will output errors to cerr and suppress warnings
-    openvdb::ax::Logger logger;
     // Construct a generic compiler
     openvdb::ax::Compiler compiler;
-    // Parse the provided code and produce an abstract syntax tree
-    // @note  Throws with parser errors if invalid. Parsable code does not
-    //        necessarily equate to compilable code
-    const openvdb::ax::ast::Tree::ConstPtr
-        ast = openvdb::ax::ast::parse(ax, logger);
-    if (!ast) return;
 
     if (points) {
         // Compile for Point support and produce an executable
         // @note  Throws compiler errors on invalid code. On success, returns
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::PointExecutable::Ptr exe =
-            compiler.compile<openvdb::ax::PointExecutable>(*ast, logger);
+            compiler.compile<openvdb::ax::PointExecutable>(ax);
+        assert(exe);
+
+        //Set the attribute bindings
+        exe->setAttributeBindings(bindings);
         // Execute on the provided points individually
         // @note  Throws on invalid point inputs such as mismatching types
         for (auto& grid : grids) {
@@ -101,7 +96,11 @@ void run(const char* ax, openvdb::GridPtrVec& grids)
         // @note  Throws compiler errors on invalid code. On success, returns
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::VolumeExecutable::Ptr exe =
-            compiler.compile<openvdb::ax::VolumeExecutable>(*ast, logger);
+            compiler.compile<openvdb::ax::VolumeExecutable>(ax);
+        assert(exe);
+
+        //Set the attribute bindings
+        exe->setAttributeBindings(bindings);
         // Execute on the provided volumes
         // @note  Throws on invalid grid inputs such as mismatching types
         exe->execute(grids);

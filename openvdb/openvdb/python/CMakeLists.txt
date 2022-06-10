@@ -55,25 +55,39 @@ endif()
 # be provided to find_package(Python) with differing major versions. e.g.
 # calls to find_package(Python 2.7) fails if python3 is found on the system.
 function(OPENVDB_CHECK_PYTHON_VERSION)
-  set(_PY_VERSION ${ARGV0})
-  set(_PY_PATH ${ARGV1})
-  if(NOT _PY_VERSION)
-    message(FATAL_ERROR "Could NOT find Python (Required is at least version "
-      "\"${MINIMUM_PYTHON_VERSION}\")"
+  set(PY_TARGET ${ARGV0})
+  set(PY_TARGET_VERSION ${ARGV1})
+  set(PY_TARGET_INCLUDES ${ARGV2})
+  set(MIN_VERSION ${ARGV3})
+  set(FUTURE_MIN_VERSION ${ARGV4})
+
+  if(NOT TARGET ${PY_TARGET})
+    message(FATAL_ERROR "Could NOT find ${PY_TARGET} (Required is at least version "
+      "\"${MIN_VERSION}\")"
     )
-  elseif(_PY_VERSION VERSION_LESS MINIMUM_PYTHON_VERSION)
-    message(FATAL_ERROR "Could NOT find Python: Found unsuitable version \"${_PY_VERSION}\""
-      "but required is at least \"${MINIMUM_PYTHON_VERSION}\" (found ${_PY_PATH})"
-    )
-  else()
-    message(STATUS "Found Python: ${_PY_PATH}) (found suitable version \"${_PY_VERSION}\", "
-      "minimum required is \"${MINIMUM_PYTHON_VERSION}\")"
-    )
+  endif()
+
+  if(PY_TARGET_VERSION AND MIN_VERSION)
+    if(PY_TARGET_VERSION VERSION_LESS MIN_VERSION)
+      message(FATAL_ERROR "Could NOT find ${PY_TARGET}: Found unsuitable version "
+        "\"${PY_TARGET_VERSION}\" but required is at least \"${MIN_VERSION}\" (found ${PY_TARGET_INCLUDES})"
+      )
+    endif()
+  endif()
+
+  message(STATUS "Found ${PY_TARGET}: ${PY_TARGET_INCLUDES}) (found suitable "
+    "version \"${PY_TARGET_VERSION}\", minimum required is \"${MIN_VERSION}\")"
+  )
+
+  if(OPENVDB_FUTURE_DEPRECATION AND PY_TARGET_VERSION AND FUTURE_MIN_VERSION)
+    if(PY_TARGET_VERSION VERSION_LESS FUTURE_MIN_VERSION)
+      message(DEPRECATION "Support for ${PY_TARGET} versions < ${FUTURE_MIN_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
 endfunction()
 
 # Configure Python and Numpy. Note that:
-#  - find_package(Python NumPy) requires CMake >= 3.14
 #  - find_package(Python Development) target Python::Module requires CMake >= 3.15
 #  - find_package(Python Development.Module) requires CMake >= 3.18
 # To ensure consistent versions between components Interpreter, Compiler,
@@ -83,40 +97,40 @@ endfunction()
 #   target but this was only added in CMake 3.15. See:
 #      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
 set(OPENVDB_PYTHON_DEPS)
-set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
+
+# @note  explicitly only search for Development.Module from 3.18 as searching
+#   Development.Embed can cause issues on linux systems where it doesn't exist
+if(${CMAKE_VERSION} VERSION_LESS 3.18)
+  set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
+else()
+  set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development.Module)
+endif()
+
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
-    list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
+  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
 endif()
 
-find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
+if(USE_NUMPY)
+  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS NumPy)
+endif()
+
+# Make sure find_package(Python) is only ever invoked once with all required components
+find_package(Python COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
+
+openvdb_check_python_version(Python::Module
+  "${Python_VERSION}"
+  "${Python_INCLUDE_DIRS}"
+  "${MINIMUM_PYTHON_VERSION}"
+  "${FUTURE_MINIMUM_PYTHON_VERSION}")
+list(APPEND OPENVDB_PYTHON_DEPS Python::Module)
 
 if(USE_NUMPY)
-  find_package(Python QUIET COMPONENTS NumPy)
-  if(NOT TARGET Python::NumPy)
-      message(FATAL_ERROR "Could NOT find NumPy (Required is at least version "
-        "\"${MINIMUM_NUMPY_VERSION}\")"
-      )
-  elseif(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
-    message(FATAL_ERROR "Could NOT find NumPy: Found unsuitable version \"${Python_NumPy_VERSION}\""
-      "but required is at least \"${MINIMUM_NUMPY_VERSION}\" (found ${Python_NumPy_INCLUDE_DIRS})"
-    )
-  else()
-    message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
-      "version \"${Python_NumPy_VERSION}\", minimum required is "
-      "\"${MINIMUM_NUMPY_VERSION}\")"
-    )
-  endif()
+  openvdb_check_python_version(Python::NumPy
+    "${Python_NumPy_VERSION}"
+    "${Python_NumPy_INCLUDE_DIRS}"
+    "${MINIMUM_NUMPY_VERSION}"
+    "${FUTURE_MINIMUM_NUMPY_VERSION}")
   list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
-endif()
-
-if(USE_NUMPY)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_NUMPY_VERSION)
-    if(Python_NumPy_VERSION VERSION_LESS FUTURE_MINIMUM_NUMPY_VERSION)
-      message(DEPRECATION "Support for NumPy versions < ${FUTURE_MINIMUM_NUMPY_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
 endif()
 
 if(TARGET openvdb_shared AND NOT Boost_USE_STATIC_LIBS)
@@ -128,69 +142,92 @@ if(TARGET openvdb_shared AND NOT Boost_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS OFF)
 endif()
 
-# Boost python handling. Try to find the following named boost python libraries:
-# - boost_python{Python_VERSION_MAJOR}${Python_VERSION_MINOR}
-# - boost_python{Python_VERSION_MAJOR}
-# - boost_python
-# Prioritize the version suffixed library, failing if none exist.
+# Boost python cmake is a mess. Implementations provided by boost's config
+# cmake and kitware's module differ significantly and different cmake versions
+# also do slightly different things regarding the major/minor suffixing. We
+# previously attempted to handle all these cases by searching for boost_python
+# three times, prioritize the version suffixed library and falling back such:
+#   - boost_python{Python_VERSION_MAJOR}${Python_VERSION_MINOR}
+#   - boost_python{Python_VERSION_MAJOR}
+#   - boost_python
+# This unfortunately fails as CMake sometimes creates an empty Boost::python
+# target on failed searches which stops subsequent searches. CMake also
+# sometimes just fails to find the suffixed versions regardless.
+#
+# Newer boost versions now seems to say that the suffixing is only required if
+# you have multiple boost installations, however the CMake implementation still
+# requires it. Boost specifically reads from Boost_PYTHON_VERSION and
+# Boost_PYTHON_VERSION_MAJOR variables. If the user has set these we just
+# search for the non suffixed versions. Note that users can also provide
+# Boost_NO_BOOST_CMAKE to skip the CMake implementation of FindBoost, though
+# this will impact other boost components.
+#
+# @todo just get rid of boost python and migrate to pybind asap.
 
-find_package(Boost ${MINIMUM_BOOST_VERSION}
-  QUIET COMPONENTS python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
-)
-find_package(Boost ${MINIMUM_BOOST_VERSION}
-  QUIET COMPONENTS python${Python_VERSION_MAJOR}
-)
-find_package(Boost ${MINIMUM_BOOST_VERSION}
-  QUIET COMPONENTS python
-)
-
-if(TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-  message(STATUS "Found boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
-  list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-elseif(TARGET Boost::python${Python_VERSION_MAJOR})
-  message(STATUS "Found boost_python${Python_VERSION_MAJOR}")
-  list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR})
-elseif(TARGET Boost::python)
-  message(STATUS "Found non-suffixed boost_python, assuming to be python version "
-    "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
-  )
-  list(APPEND OPENVDB_PYTHON_DEPS Boost::python)
-else()
-  message(FATAL_ERROR "Unable to find boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}, "
-    "boost_python${Python_VERSION_MAJOR} or boost_python."
-  )
+set(_REQUIRED_BOOST_COMPONENTS python)
+if(USE_NUMPY)
+  list(APPEND _REQUIRED_BOOST_COMPONENTS numpy)
 endif()
 
-# If boost >= 1.65, find the required numpy boost component and link that in.
-# Use the same system as above, first trying without the suffix, then with.
+if(Boost_PYTHON_VERSION OR
+   Boost_PYTHON_VERSION_MAJOR)
+  # Search for non-suffixed boost libraries
+  find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS ${_REQUIRED_BOOST_COMPONENTS} REQUIRED)
+else()
+  # Try to find matching boost components to the version of python detected
+  list(TRANSFORM _REQUIRED_BOOST_COMPONENTS APPEND ${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
 
-if(USE_NUMPY)
-  find_package(Boost ${MINIMUM_BOOST_VERSION}
-    QUIET COMPONENTS numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
-  )
-  find_package(Boost ${MINIMUM_BOOST_VERSION}
-    QUIET COMPONENTS numpy${Python_VERSION_MAJOR}
-  )
-  find_package(Boost ${MINIMUM_BOOST_VERSION}
-    QUIET COMPONENTS numpy
-  )
+  # Explicitly don't pass REQUIRED so we can provide the user a message with
+  # instructions to circumvent the major/minor requirement.
+  find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS ${_REQUIRED_BOOST_COMPONENTS})
 
-  if(TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-    message(STATUS "Found boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
-    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-  elseif(TARGET Boost::numpy${Python_VERSION_MAJOR})
-    message(STATUS "Found boost_numpy${Python_VERSION_MAJOR}")
-    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR})
-  elseif(TARGET Boost::numpy)
-    message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
-      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
-    )
-    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy)
-  else()
-    message(FATAL_ERROR "Unable to find boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}, "
-      "boost_numpy${Python_VERSION_MAJOR} or boost_numpy."
-    )
+  # See if we found the target. If we didn't and CMake/Boost created a broken
+  # aliased target, we can't try another search. Build an error message and stop.
+  set(_BOOST_ERROR "")
+  if(NOT TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR} AND TARGET Boost::python)
+    list(APPEND _BOOST_ERROR "boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
   endif()
+  if(USE_NUMPY AND NOT TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR} AND TARGET Boost::numpy)
+    list(APPEND _BOOST_ERROR "boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
+  endif()
+
+  if(_BOOST_ERROR)
+    message(FATAL_ERROR "Unable to find versioned boost python libraries (${_BOOST_ERROR}). It's "
+      "recommended that your installation of boost_python/boost_numpy match your python version "
+      "exactly.\n"
+      "Alternatively, you can try to search for boost python versions explicitly with either:\n"
+      "  'Boost_PYTHON_VERSION=XY'\n"
+      "  'Boost_PYTHON_VERSION_MAJOR=X'")
+  endif()
+
+  # If we didn't create the target but CMake didn't create a broken alias, try another search
+  if(NOT TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR} AND NOT TARGET Boost::python)
+    find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS python REQUIRED)
+    message(STATUS "Found non-suffixed boost_python, assuming to be python version "
+        "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
+  endif()
+  if(USE_NUMPY AND
+     NOT TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR} AND NOT TARGET Boost::numpy)
+    find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS numpy REQUIRED)
+    message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
+        "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
+  endif()
+endif()
+
+if(TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+elseif(TARGET Boost::python)
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::python)
+  message(STATUS "Found non-suffixed boost_python, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
+endif()
+
+if(TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+elseif(TARGET Boost::numpy)
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy)
+  message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
 endif()
 
 ##########################################################################
@@ -235,17 +272,6 @@ elseif(WIN32)
   set_target_properties(pyopenvdb PROPERTIES SUFFIX ".pyd") # .pyd on windows
 endif()
 
-if(TARGET Python::Module)
-  list(APPEND OPENVDB_PYTHON_DEPS Python::Module)
-else()
-  if(APPLE)
-    target_include_directories(pyopenvdb SYSTEM PUBLIC ${Python_INCLUDE_DIRS})
-    target_link_options(pyopenvdb PUBLIC -undefined dynamic_lookup)
-  else()
-    list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
-  endif()
-endif()
-
 target_link_libraries(pyopenvdb PUBLIC
   ${OPENVDB_LIB}
   ${OPENVDB_PYTHON_DEPS}
@@ -272,7 +298,7 @@ install(TARGETS
   ${PYOPENVDB_INSTALL_DIRECTORY}
 )
 
-install(FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/python)
+install(FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/python)
 
 # pytest
 if(OPENVDB_BUILD_PYTHON_UNITTESTS)

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb_ax/ax.h>
+#include <openvdb_ax/compiler/Logger.h>
 #include <openvdb_ax/Exceptions.h>
 
 #include <openvdb/points/PointDataGrid.h>
@@ -16,10 +17,12 @@ public:
     CPPUNIT_TEST_SUITE(TestAXRun);
     CPPUNIT_TEST(singleRun);
     CPPUNIT_TEST(multiRun);
+    CPPUNIT_TEST(regressions);
     CPPUNIT_TEST_SUITE_END();
 
     void singleRun();
     void multiRun();
+    void regressions();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestAXRun);
@@ -31,12 +34,11 @@ TestAXRun::singleRun()
     f.setName("a");
     f.tree().setValueOn({0,0,0}, 0.0f);
 
-    // test lexer errors which return an invlid AST
-    openvdb::ax::run("@c = 1.0f", f); // no-semicolon
-
     openvdb::ax::run("@a = 1.0f;", f);
     CPPUNIT_ASSERT_EQUAL(1.0f, f.tree().getValue({0,0,0}));
 
+    openvdb::ax::run("@b = 2.0f;", f, {{"b", "a"}});
+    CPPUNIT_ASSERT_EQUAL(2.0f, f.tree().getValue({0,0,0}));
     openvdb::math::Transform::Ptr defaultTransform =
         openvdb::math::Transform::createLinearTransform();
     const std::vector<openvdb::Vec3d> singlePointZero = {openvdb::Vec3d::zero()};
@@ -54,22 +56,15 @@ TestAXRun::singleRun()
     CPPUNIT_ASSERT(descriptor.valueType(idx) == openvdb::typeNameAsString<float>());
     openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(idx));
     CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+
+    openvdb::ax::run("@b = 2.0f;", *points, {{"b","a"}});
+
+    CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
 }
 
 void
 TestAXRun::multiRun()
 {
-    {
-        // test error on points and volumes
-        openvdb::FloatGrid::Ptr f(new openvdb::FloatGrid);
-        openvdb::points::PointDataGrid::Ptr p(new openvdb::points::PointDataGrid);
-        std::vector<openvdb::GridBase::Ptr> v1 { f, p };
-        CPPUNIT_ASSERT_THROW(openvdb::ax::run("@a = 1.0f;", v1), openvdb::AXCompilerError);
-
-        std::vector<openvdb::GridBase::Ptr> v2 { p, f };
-        CPPUNIT_ASSERT_THROW(openvdb::ax::run("@a = 1.0f;", v2), openvdb::AXCompilerError);
-    }
-
     {
         // multi volumes
         openvdb::FloatGrid::Ptr f1(new openvdb::FloatGrid);
@@ -80,12 +75,13 @@ TestAXRun::multiRun()
         f2->tree().setValueOn({0,0,0}, 0.0f);
         std::vector<openvdb::GridBase::Ptr> v { f1, f2 };
 
-        // test lexer errors which return an invlid AST
-        openvdb::ax::run("@c = 1.0f", v); // no-semicolon
-
         openvdb::ax::run("@a = @b = 1;", v);
         CPPUNIT_ASSERT_EQUAL(1.0f, f1->tree().getValue({0,0,0}));
         CPPUNIT_ASSERT_EQUAL(1.0f, f2->tree().getValue({0,0,0}));
+
+        openvdb::ax::run("@c = @d = 2;", v, {{"c","a"}, {"d","b"}});
+        CPPUNIT_ASSERT_EQUAL(2.0f, f1->tree().getValue({0,0,0}));
+        CPPUNIT_ASSERT_EQUAL(2.0f, f2->tree().getValue({0,0,0}));
     }
 
     {
@@ -131,6 +127,50 @@ TestAXRun::multiRun()
         CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
         handle = openvdb::points::AttributeHandle<float>(leafIter2->constAttributeArray(idx2));
         CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+
+        openvdb::ax::run("@c = @d = 2;", v, {{"c","a"}, {"d","b"}});
+        handle = openvdb::points::AttributeHandle<float>(leafIter1->constAttributeArray(idx1));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
+        handle = openvdb::points::AttributeHandle<float>(leafIter1->constAttributeArray(idx2));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
+
+        handle = openvdb::points::AttributeHandle<float>(leafIter2->constAttributeArray(idx1));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
+        handle = openvdb::points::AttributeHandle<float>(leafIter2->constAttributeArray(idx2));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
     }
 }
 
+void
+TestAXRun::regressions()
+{
+    openvdb::points::PointDataGrid::Ptr p1(new openvdb::points::PointDataGrid);
+    openvdb::points::PointDataGrid::Ptr p2(new openvdb::points::PointDataGrid);
+    openvdb::FloatGrid::Ptr f1(new openvdb::FloatGrid);
+    openvdb::FloatGrid::Ptr f2(new openvdb::FloatGrid);
+    std::vector<openvdb::GridBase::Ptr> g1 { f1, f2 };
+    std::vector<openvdb::GridBase::Ptr> g2 { p1, p2 };
+
+    {
+        // test error on points and volumes
+        std::vector<openvdb::GridBase::Ptr> v1 { f1, p1 };
+        std::vector<openvdb::GridBase::Ptr> v2 { p1, f1 };
+        CPPUNIT_ASSERT_THROW(openvdb::ax::run("@a = 1.0f;", v1), openvdb::AXCompilerError);
+        CPPUNIT_ASSERT_THROW(openvdb::ax::run("@a = 1.0f;", v2), openvdb::AXCompilerError);
+    }
+
+    // Various tests which have been caught during developement
+
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("{} =", g1), openvdb::AXSyntaxError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("{} =", g2), openvdb::AXSyntaxError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("{} =", *f1), openvdb::AXSyntaxError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("{} =", *p1), openvdb::AXSyntaxError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("@c = 1.0f", g1), openvdb::AXSyntaxError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("@c = 1.0f", g2), openvdb::AXSyntaxError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("@c = 1.0f", *f1), openvdb::AXSyntaxError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("@c = 1.0f", *p1), openvdb::AXSyntaxError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("if (v@v) {}", g1), openvdb::AXCompilerError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("if (v@v) {}", g2), openvdb::AXCompilerError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("if (v@v) {}", *f1), openvdb::AXCompilerError);
+    CPPUNIT_ASSERT_THROW(openvdb::ax::run("if (v@v) {}", *p1), openvdb::AXCompilerError);
+}

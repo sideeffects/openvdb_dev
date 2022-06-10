@@ -18,8 +18,10 @@
 #ifndef OPENVDB_AX_AX_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_AX_HAS_BEEN_INCLUDED
 
+#include <openvdb_ax/compiler/AttributeBindings.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/version.h>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -30,18 +32,18 @@ namespace ax {
 /// @details  Must be called before any AX compilation or execution is performed.
 ///           Can be safely called from multiple threads. Cannot be called after
 ///           uninitialize has been called.
-void initialize();
+OPENVDB_AX_API void initialize();
 
 /// @brief  Check to see if OpenVDB AX components have been initialized.
 /// @note  Can be safely called from multiple threads.
-bool isInitialized();
+OPENVDB_AX_API bool isInitialized();
 
 /// @brief  Uninitialize and deregister OpenVDB AX.
 /// @details  This has the important function of shutting down LLVM and
 ///           correctly freeing statically allocated LLVM types. Should be
 ///           called on application termination. Can be safely called from
 ///           multiple threads.
-void uninitialize();
+OPENVDB_AX_API void uninitialize();
 
 ////////////////////////////////////////
 ////////////////////////////////////////
@@ -63,7 +65,14 @@ void uninitialize();
 ///        stages. See Exceptions.h for the possible different errors.
 /// @param  ax    The null terminated AX code string to parse and compile
 /// @param  grid  The grid to which to apply the compiled AX function
-void run(const char* ax, openvdb::GridBase& grid);
+/// @param  bindings An attribute bindings object mapping names in the AX string to
+///                  names of the point attributes/grids (points/volumes resp.)
+///                  This can be initialized as a vector of pairs of strings e.g.
+///                  {{"axname0","dataname0"}, {"axname1","dataname1"}} see
+///                  AttributeBindings.h for details.
+OPENVDB_AX_API
+void run(const char* ax, openvdb::GridBase& grid,
+         const AttributeBindings& bindings = {});
 
 /// @brief  Run a full AX pipeline (parse, compile and execute) on a vector of
 ///         OpenVDB numerical grids OR a vector of OpenVDB Point Data grids.
@@ -85,7 +94,14 @@ void run(const char* ax, openvdb::GridBase& grid);
 ///        stages. See Exceptions.h for the possible different errors.
 /// @param  ax     The null terminated AX code string to parse and compile
 /// @param  grids  The grids to which to apply the compiled AX function
-void run(const char* ax, openvdb::GridPtrVec& grids);
+/// @param  bindings An attribute bindings object mapping names in the AX string to
+///                  names of the point attributes/grids (points/volumes resp.)
+///                  This can be initialized as a vector of pairs of strings e.g.
+///                  {{"axname0","dataname0"}, {"axname1","dataname1"}} see
+///                  AttributeBindings.h for details.
+OPENVDB_AX_API
+void run(const char* ax, openvdb::GridPtrVec& grids,
+         const AttributeBindings& bindings = {});
 
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME
