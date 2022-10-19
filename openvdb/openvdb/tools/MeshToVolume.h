@@ -3141,7 +3141,7 @@ traceExteriorBoundaries(FloatTreeT& tree)
 ////////////////////////////////////////
     
 
-template <typename T, Index Log2Dim, typename InteriorTest >
+template <typename T, Index Log2Dim, typename InteriorTest>
 void 
 floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& interiorTest) {
 
@@ -3162,9 +3162,10 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
 
     for (Index offset=0; offset<SIZE; offset++) {
 	const auto value = leafNode.getValue(offset);
+	
 	// We do not assign anything for voxel close to the mesh
 	// This condition is aligned with the condition in traceVoxelLine
-	if (value <= 0.75) {
+	if (abs(value) <= 0.75) {
 	    voxelState[offset] = NOT_ASSIGNED;
 	} else if (voxelState[offset] == NOT_VISITED) {
 
@@ -3186,25 +3187,27 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
 		voxelState[off] = state;
 
 		if (state == NEGATIVE) {
-		    leafNode.setValueOnly(off, -leafNode.getValue(off));
+		    leafNode.setValueOnly(off, -abs(leafNode.getValue(off)));
 		}
 
 		// iterate over all neighbours and assign identical state
 		// if they have not been visited and if they are far away
 		// from the mesh (the condition is same as in traceVoxelLine)
-		for (int i = -1; i <=1; ++(++i)){
-		    for (int j = -1; j <=1; ++(++j)){
-			for (int k = -1; k <=1; ++(++k)){
+		for (int i = -1; i <=1;){
+		    for (int j = -1; j <=1;){
+			for (int k = -1; k <=1;){
 			    auto neighOff = off + k + DIM * (j + DIM * i);
 			    if (0 < neighOff &&     
 				neighOff < SIZE &&  
 			        voxelState[neighOff] == NOT_VISITED &&
-			        leafNode.getValue(neighOff) > 0.75) {
-				
+			        abs(leafNode.getValue(neighOff)) > 0.75) {
 				offsetStack.push_back({neighOff, state});
 			    }
+			    k+=2;
 			}
+			j+=2;
 		    }
+		    i+=2;
 		}
 	    }
 	}
@@ -3255,13 +3258,14 @@ evaluateInteriorTest(FloatTreeT& tree, InteriorTest interiorTest, InteriorTestSt
 
     if (interiorTestStrategy == EVAL_EVERY_TILE) {
 
-	using LeafT = typename FloatTreeT::LeafNodeType;
+	using LeafT = typename FloatTree::LeafNodeType;
 	
 	auto op = [interiorTest](auto& node) {
 	    using Node = std::decay_t<decltype(node)>;
 	    
 	    if constexpr (std::is_same_v<Node, LeafT>) {
-		// leaf node
+		
+		// // leaf node
 		LeafT& leaf = static_cast<LeafT&>(node);
 
 		floodFillLeafNode(leaf, interiorTest);
@@ -3278,7 +3282,13 @@ evaluateInteriorTest(FloatTreeT& tree, InteriorTest interiorTest, InteriorTestSt
 	};
 
         openvdb::tree::NodeManager nodes(tree);
-	nodes.foreachBottomUp(op);
+	nodes.foreachBottomUp(op, false);
+
+	
+	// FloatTree t;
+        // openvdb::tree::NodeManager n(t);
+	// n.foreachBottomUp(op, false);
+
     }
 } // void evaluateInteriorTest()
     
