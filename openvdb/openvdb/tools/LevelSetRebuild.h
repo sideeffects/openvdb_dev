@@ -264,11 +264,11 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
     
     if (interrupter) {
         return meshToVolume<GridType>(*interrupter, mesh, *transform, exBandWidth, inBandWidth,
-            DISABLE_RENORMALIZATION, nullptr, interiorTest, EVAL_EVERY_TILE);
+            DISABLE_RENORMALIZATION, nullptr, interiorTest, EVAL_EVERY_VOXEL);
     }
 
     return meshToVolume<GridType>(mesh, *transform, exBandWidth, inBandWidth,
-        DISABLE_RENORMALIZATION, nullptr, interiorTest, EVAL_EVERY_TILE);
+        DISABLE_RENORMALIZATION, nullptr, interiorTest, EVAL_EVERY_VOXEL);
 }
 
 

@@ -3175,8 +3175,10 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
 		// Yes we assigne positive values to interior points
 		// this is aligned with how meshToVolume works internally
 		offsetStack.push_back({offset, POSITIVE});
+		voxelState[offset] = POSITIVE;
 	    } else {
 		offsetStack.push_back({offset, NEGATIVE});
+		voxelState[offset] = NEGATIVE;
 	    }
 
 	    while(!offsetStack.empty()){
@@ -3184,30 +3186,29 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
 		auto [off, state] = offsetStack[offsetStack.size()-1];
 		offsetStack.pop_back();
 
-		voxelState[off] = state;
-
 		if (state == NEGATIVE) {
-		    leafNode.setValueOnly(off, -abs(leafNode.getValue(off)));
+		    leafNode.setValueOnly(off, -leafNode.getValue(off));
 		}
 
 		// iterate over all neighbours and assign identical state
 		// if they have not been visited and if they are far away
 		// from the mesh (the condition is same as in traceVoxelLine)
-		for (int i = -1; i <=1;){
-		    for (int j = -1; j <=1;){
-			for (int k = -1; k <=1;){
-			    auto neighOff = off + k + DIM * (j + DIM * i);
-			    if (0 < neighOff &&     
-				neighOff < SIZE &&  
-			        voxelState[neighOff] == NOT_VISITED &&
-			        abs(leafNode.getValue(neighOff)) > 0.75) {
+		for (int dim=2; dim>=0; dim--){
+		    for (int i = -1; i <=1; ++(++i)){
+			int dimIdx = (off >> dim * Log2Dim) % DIM;
+		        auto neighOff = off + (1 << dim * Log2Dim) * i;			
+			if ((0 < dimIdx) &&     
+			    (dimIdx < DIM - 1) &&  
+			    (voxelState[neighOff] == NOT_VISITED)) {
+
+			    if (abs(leafNode.getValue(neighOff)) <= 0.75) {
+				voxelState[neighOff] = NOT_ASSIGNED;
+			    } else {
 				offsetStack.push_back({neighOff, state});
+				voxelState[neighOff] = state;
 			    }
-			    k+=2;
 			}
-			j+=2;
 		    }
-		    i+=2;
 		}
 	    }
 	}
@@ -3243,22 +3244,35 @@ evaluateInteriorTest(FloatTreeT& tree, InteriorTest interiorTest, InteriorTestSt
     static_assert(std::is_copy_constructible_v<InteriorTest>,
 		 "InteriorTest has to be copyable!");
 
+    using LeafT = typename FloatTreeT::LeafNodeType;    
+
     if (interiorTestStrategy == EVAL_EVERY_VOXEL) {
 
-	auto op = [interiorTest](auto& iter) {
-	    if (interiorTest(iter.getCoord())) {
-		iter.setValue(abs(*iter));
-	    } else {
-		iter.setValue(-abs(*iter));
-	    }
-	};
+	auto op = [interiorTest](auto& node) {
+	    using Node = std::decay_t<decltype(node)>;		      
 
-	openvdb::tools::foreach(tree.beginValueAll(), op, true, false);
+	    if constexpr (std::is_same_v<Node, LeafT>) {
+
+		for (auto iter = node.beginValueAll(); iter; ++iter) {
+		    if (!interiorTest(iter.getCoord())) {
+			iter.setValue(-*iter);
+		    }
+		}
+
+	    } else {
+		for (auto iter = node.beginChildOff(); iter; ++iter) {
+		    if (!interiorTest(iter.getCoord())) {
+			iter.setValue(-*iter);
+		    }
+		}
+	    }
+	};	
+
+        openvdb::tree::NodeManager nodes(tree);
+	nodes.foreachBottomUp(op);
     }
 
     if (interiorTestStrategy == EVAL_EVERY_TILE) {
-
-	using LeafT = typename FloatTree::LeafNodeType;
 	
 	auto op = [interiorTest](auto& node) {
 	    using Node = std::decay_t<decltype(node)>;
@@ -3272,23 +3286,15 @@ evaluateInteriorTest(FloatTreeT& tree, InteriorTest interiorTest, InteriorTestSt
 
 	    } else {
 		for (auto iter = node.beginChildOff(); iter; ++iter) {
-		    if (interiorTest(iter.getCoord())) {
-			iter.setValue(abs(*iter));
-		    } else {
-			iter.setValue(-abs(*iter));
+		    if (!interiorTest(iter.getCoord())) {
+			iter.setValue(-*iter);
 		    }
 		}
 	    }
 	};
 
         openvdb::tree::NodeManager nodes(tree);
-	nodes.foreachBottomUp(op, false);
-
-	
-	// FloatTree t;
-        // openvdb::tree::NodeManager n(t);
-	// n.foreachBottomUp(op, false);
-
+	nodes.foreachBottomUp(op);
     }
 } // void evaluateInteriorTest()
     
