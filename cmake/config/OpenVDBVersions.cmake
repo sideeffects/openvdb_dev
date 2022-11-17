@@ -30,12 +30,12 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # What's usually important is that the version of libstdc++ and glibc in use
   # matches. Compilers other than GCC should provide options to ensure this
   # targetting e.g. --gcc-toolchain and -fgnuc-version with Clang.
-  set(MINIMUM_GCC_VERSION 9.3.1)
+  set(MINIMUM_GCC_VERSION 8.4.0)
   set(MINIMUM_CLANG_VERSION 5.0)
   set(MINIMUM_ICC_VERSION 19)
   set(MINIMUM_MSVC_VERSION 19.10) # 1910 (Visual Studio 2017 15.0)
 
-  set(MINIMUM_BOOST_VERSION 1.73)
+  set(MINIMUM_BOOST_VERSION 1.72)
   set(MINIMUM_ILMBASE_VERSION 2.4)
   set(MINIMUM_OPENEXR_VERSION 2.4)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
