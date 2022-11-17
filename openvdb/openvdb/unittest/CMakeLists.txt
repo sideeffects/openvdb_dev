@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -171,7 +171,6 @@ else()
     TestTreeCombine.cc
     TestTreeGetSetValues.cc
     TestTreeIterators.cc
-    TestTreeVisitor.cc
     TestTypes.cc
     TestUtil.cc
     TestValueAccessor.cc
