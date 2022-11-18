@@ -77,11 +77,12 @@ enum MeshToVolumeFlags {
     DISABLE_NARROW_BAND_TRIMMING = 0x8
 };
 
-    
-/// @brief Different staregies how to determine sign of an SDF when using interior test.
+
+/// @brief Different staregies how to determine sign of an SDF when using
+/// interior test.
 enum InteriorTestStrategy {
 
-   /// Evaluates interior test at every voxel. This is usefull when we rebuild already 
+   /// Evaluates interior test at every voxel. This is usefull when we rebuild already
    /// existing SDF where evaluating previous grid is cheap
    EVAL_EVERY_VOXEL = 0,
 
@@ -89,7 +90,7 @@ enum InteriorTestStrategy {
    EVAL_EVERY_TILE = 1,
 };
 
-    
+
 /// @brief  Convert polygonal meshes that consist of quads and/or triangles into
 ///         signed or unsigned distance field volumes.
 ///
@@ -3139,79 +3140,78 @@ traceExteriorBoundaries(FloatTreeT& tree)
 
 
 ////////////////////////////////////////
-    
 
 template <typename T, Index Log2Dim, typename InteriorTest>
-void 
+void
 floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& interiorTest) {
 
     enum VoxelState {
         NOT_VISITED = 0,
-	POSITIVE = 1, 
-	NEGATIVE = 2,
-	NOT_ASSIGNED = 3
+        POSITIVE = 1,
+        NEGATIVE = 2,
+        NOT_ASSIGNED = 3
     };
 
     const auto DIM = leafNode.DIM;
     const auto SIZE = leafNode.SIZE;
 
     std::vector<VoxelState> voxelState(SIZE, NOT_VISITED);
-    
+
     std::vector<std::pair<Index, VoxelState>> offsetStack;
     offsetStack.reserve(SIZE);
 
     for (Index offset=0; offset<SIZE; offset++) {
-	const auto value = leafNode.getValue(offset);
-	
-	// We do not assign anything for voxel close to the mesh
-	// This condition is aligned with the condition in traceVoxelLine
-	if (abs(value) <= 0.75) {
-	    voxelState[offset] = NOT_ASSIGNED;
-	} else if (voxelState[offset] == NOT_VISITED) {
+        const auto value = leafNode.getValue(offset);
 
-	    auto coord = leafNode.offsetToGlobalCoord(offset);
-	    
-	    if (interiorTest(coord)){
-		// Yes we assigne positive values to interior points
-		// this is aligned with how meshToVolume works internally
-		offsetStack.push_back({offset, POSITIVE});
-		voxelState[offset] = POSITIVE;
-	    } else {
-		offsetStack.push_back({offset, NEGATIVE});
-		voxelState[offset] = NEGATIVE;
-	    }
+        // We do not assign anything for voxel close to the mesh
+        // This condition is aligned with the condition in traceVoxelLine
+        if (abs(value) <= 0.75) {
+            voxelState[offset] = NOT_ASSIGNED;
+        } else if (voxelState[offset] == NOT_VISITED) {
 
-	    while(!offsetStack.empty()){
+            auto coord = leafNode.offsetToGlobalCoord(offset);
 
-		auto [off, state] = offsetStack[offsetStack.size()-1];
-		offsetStack.pop_back();
+            if (interiorTest(coord)){
+                // Yes we assigne positive values to interior points
+                // this is aligned with how meshToVolume works internally
+                offsetStack.push_back({offset, POSITIVE});
+                voxelState[offset] = POSITIVE;
+            } else {
+                offsetStack.push_back({offset, NEGATIVE});
+                voxelState[offset] = NEGATIVE;
+            }
 
-		if (state == NEGATIVE) {
-		    leafNode.setValueOnly(off, -leafNode.getValue(off));
-		}
+            while(!offsetStack.empty()){
 
-		// iterate over all neighbours and assign identical state
-		// if they have not been visited and if they are far away
-		// from the mesh (the condition is same as in traceVoxelLine)
-		for (int dim=2; dim>=0; dim--){
-		    for (int i = -1; i <=1; ++(++i)){
-			int dimIdx = (off >> dim * Log2Dim) % DIM;
-		        auto neighOff = off + (1 << dim * Log2Dim) * i;			
-			if ((0 < dimIdx) &&     
-			    (dimIdx < DIM - 1) &&  
-			    (voxelState[neighOff] == NOT_VISITED)) {
+                auto [off, state] = offsetStack[offsetStack.size()-1];
+                offsetStack.pop_back();
 
-			    if (abs(leafNode.getValue(neighOff)) <= 0.75) {
-				voxelState[neighOff] = NOT_ASSIGNED;
-			    } else {
-				offsetStack.push_back({neighOff, state});
-				voxelState[neighOff] = state;
-			    }
-			}
-		    }
-		}
-	    }
-	}
+                if (state == NEGATIVE) {
+                    leafNode.setValueOnly(off, -leafNode.getValue(off));
+                }
+
+                // iterate over all neighbours and assign identical state
+                // if they have not been visited and if they are far away
+                // from the mesh (the condition is same as in traceVoxelLine)
+                for (int dim=2; dim>=0; dim--){
+                    for (int i = -1; i <=1; ++(++i)){
+                        int dimIdx = (off >> dim * Log2Dim) % DIM;
+                        auto neighOff = off + (1 << dim * Log2Dim) * i;
+                        if ((0 < dimIdx) &&
+                            (dimIdx < DIM - 1) &&
+                            (voxelState[neighOff] == NOT_VISITED)) {
+
+                            if (abs(leafNode.getValue(neighOff)) <= 0.75) {
+                                voxelState[neighOff] = NOT_ASSIGNED;
+                            } else {
+                                offsetStack.push_back({neighOff, state});
+                                voxelState[neighOff] = state;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -3224,7 +3224,7 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
 ///
 /// InteriorTest has to be a function `Coord -> bool` which evaluates true
 /// inside of the mesh and false outside.
-/// 
+///
 /// Furthermore, InteriorTest does not have to be thread-safe, but it has to be
 /// copy constructible and evaluating different coppy has to be thread-safe.
 ///
@@ -3240,64 +3240,62 @@ void
 evaluateInteriorTest(FloatTreeT& tree, InteriorTest interiorTest, InteriorTestStrategy interiorTestStrategy)
 {
     static_assert(std::is_invocable_r<bool, InteriorTest, Coord>::value,
-		 "InteriorTest has to be a function `Coord -> bool`!");
+                 "InteriorTest has to be a function `Coord -> bool`!");
     static_assert(std::is_copy_constructible_v<InteriorTest>,
-		 "InteriorTest has to be copyable!");
+                 "InteriorTest has to be copyable!");
 
-    using LeafT = typename FloatTreeT::LeafNodeType;    
+    using LeafT = typename FloatTreeT::LeafNodeType;
 
     if (interiorTestStrategy == EVAL_EVERY_VOXEL) {
 
-	auto op = [interiorTest](auto& node) {
-	    using Node = std::decay_t<decltype(node)>;		      
+        auto op = [interiorTest](auto& node) {
+            using Node = std::decay_t<decltype(node)>;
 
-	    if constexpr (std::is_same_v<Node, LeafT>) {
+            if constexpr (std::is_same_v<Node, LeafT>) {
 
-		for (auto iter = node.beginValueAll(); iter; ++iter) {
-		    if (!interiorTest(iter.getCoord())) {
-			iter.setValue(-*iter);
-		    }
-		}
+                for (auto iter = node.beginValueAll(); iter; ++iter) {
+                    if (!interiorTest(iter.getCoord())) {
+                        iter.setValue(-*iter);
+                    }
+                }
 
-	    } else {
-		for (auto iter = node.beginChildOff(); iter; ++iter) {
-		    if (!interiorTest(iter.getCoord())) {
-			iter.setValue(-*iter);
-		    }
-		}
-	    }
-	};	
+            } else {
+                for (auto iter = node.beginChildOff(); iter; ++iter) {
+                    if (!interiorTest(iter.getCoord())) {
+                        iter.setValue(-*iter);
+                    }
+                }
+            }
+        };
 
         openvdb::tree::NodeManager nodes(tree);
-	nodes.foreachBottomUp(op);
+        nodes.foreachBottomUp(op);
     }
 
     if (interiorTestStrategy == EVAL_EVERY_TILE) {
-	
-	auto op = [interiorTest](auto& node) {
-	    using Node = std::decay_t<decltype(node)>;
-	    
-	    if constexpr (std::is_same_v<Node, LeafT>) {
-		
-		// // leaf node
-		LeafT& leaf = static_cast<LeafT&>(node);
 
-		floodFillLeafNode(leaf, interiorTest);
+        auto op = [interiorTest](auto& node) {
+            using Node = std::decay_t<decltype(node)>;
 
-	    } else {
-		for (auto iter = node.beginChildOff(); iter; ++iter) {
-		    if (!interiorTest(iter.getCoord())) {
-			iter.setValue(-*iter);
-		    }
-		}
-	    }
-	};
+            if constexpr (std::is_same_v<Node, LeafT>) {
+                // // leaf node
+                LeafT& leaf = static_cast<LeafT&>(node);
+
+                floodFillLeafNode(leaf, interiorTest);
+
+            } else {
+                for (auto iter = node.beginChildOff(); iter; ++iter) {
+                    if (!interiorTest(iter.getCoord())) {
+                        iter.setValue(-*iter);
+                    }
+                }
+            }
+        };
 
         openvdb::tree::NodeManager nodes(tree);
-	nodes.foreachBottomUp(op);
+        nodes.foreachBottomUp(op);
     }
 } // void evaluateInteriorTest()
-    
 
 ////////////////////////////////////////
 
@@ -3426,52 +3424,50 @@ meshToVolume(
 
     if (computeSignedDistanceField) {
 
- 	/// If interior test is not provided 
-	if constexpr (std::is_same_v<InteriorTest, std::nullptr_t>) {
-	    
-	    // Determines the inside/outside state for the narrow band of voxels.
-	    traceExteriorBoundaries(distTree);
-	    
-	} else {
-	    evaluateInteriorTest(distTree, interiorTest, interiorTestStrat);
-	}
+        /// If interior test is not provided
+        if constexpr (std::is_same_v<InteriorTest, std::nullptr_t>) {
+            // Determines the inside/outside state for the narrow band of voxels.
+            traceExteriorBoundaries(distTree);
+        } else {
+            evaluateInteriorTest(distTree, interiorTest, interiorTestStrat);
+        }
 
-	/// Do not fix intersecting voxels if we have evaluated interior test for every voxel.
-	bool signInitializedForEveryVoxel =
-		/// interior test was provided i.e. not null
-		!std::is_same_v<InteriorTest, std::nullptr_t> &&
-                /// interior test was evaluated for every voxel		
-		interiorTestStrat == EVAL_EVERY_VOXEL;
-	
-	if (!signInitializedForEveryVoxel) {
+        /// Do not fix intersecting voxels if we have evaluated interior test for every voxel.
+        bool signInitializedForEveryVoxel =
+                /// interior test was provided i.e. not null
+                !std::is_same_v<InteriorTest, std::nullptr_t> &&
+                /// interior test was evaluated for every voxel
+                interiorTestStrat == EVAL_EVERY_VOXEL;
 
-	    std::vector<LeafNodeType*> nodes;
-	    nodes.reserve(distTree.leafCount());
-	    distTree.getNodes(nodes);
+        if (!signInitializedForEveryVoxel) {
 
-	    const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
+            std::vector<LeafNodeType*> nodes;
+            nodes.reserve(distTree.leafCount());
+            distTree.getNodes(nodes);
 
-	    using SignOp =
-		mesh_to_volume_internal::ComputeIntersectingVoxelSign<TreeType, MeshDataAdapter>;
+            const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
 
-	    tbb::parallel_for(nodeRange, SignOp(nodes, distTree, indexTree, mesh));
+            using SignOp =
+                mesh_to_volume_internal::ComputeIntersectingVoxelSign<TreeType, MeshDataAdapter>;
 
-	    if (interrupter.wasInterrupted(45)) return distGrid;
+            tbb::parallel_for(nodeRange, SignOp(nodes, distTree, indexTree, mesh));
 
-	    // Remove voxels created by self intersecting portions of the mesh.
-	    if (removeIntersectingVoxels) {
+            if (interrupter.wasInterrupted(45)) return distGrid;
 
-		tbb::parallel_for(nodeRange,
-		    mesh_to_volume_internal::ValidateIntersectingVoxels<TreeType>(distTree, nodes));
+            // Remove voxels created by self intersecting portions of the mesh.
+            if (removeIntersectingVoxels) {
 
-		tbb::parallel_for(nodeRange,
-		    mesh_to_volume_internal::RemoveSelfIntersectingSurface<TreeType>(
-			nodes, distTree, indexTree));
+                tbb::parallel_for(nodeRange,
+                    mesh_to_volume_internal::ValidateIntersectingVoxels<TreeType>(distTree, nodes));
 
-		tools::pruneInactive(distTree,  /*threading=*/true);
-		tools::pruneInactive(indexTree, /*threading=*/true);
-	    }
-	}
+                tbb::parallel_for(nodeRange,
+                    mesh_to_volume_internal::RemoveSelfIntersectingSurface<TreeType>(
+                        nodes, distTree, indexTree));
+
+                tools::pruneInactive(distTree,  /*threading=*/true);
+                tools::pruneInactive(indexTree, /*threading=*/true);
+            }
+        }
     }
 
     if (interrupter.wasInterrupted(50)) return distGrid;
