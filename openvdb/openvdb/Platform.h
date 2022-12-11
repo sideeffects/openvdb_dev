@@ -93,6 +93,16 @@
 #else
 #define OPENVDB_LIKELY(x) (x)
 #define OPENVDB_UNLIKELY(x) (x)
+
+/// Force inline function macros. These macros do not necessary guarantee that
+/// the decorated function will be inlined, but provide the strongest vendor
+/// annotations to that end.
+#if defined(__GNUC__)
+#define OPENVDB_FORCE_INLINE __attribute__((always_inline)) inline
+#elif defined(_MSC_VER)
+#define OPENVDB_FORCE_INLINE __forceinline
+#else
+#define OPENVDB_FORCE_INLINE inline
 #endif
 
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
