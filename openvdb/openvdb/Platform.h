@@ -93,6 +93,7 @@
 #else
 #define OPENVDB_LIKELY(x) (x)
 #define OPENVDB_UNLIKELY(x) (x)
+#endif
 
 /// Force inline function macros. These macros do not necessary guarantee that
 /// the decorated function will be inlined, but provide the strongest vendor
