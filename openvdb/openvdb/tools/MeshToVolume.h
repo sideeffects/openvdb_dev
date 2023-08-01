@@ -3145,6 +3145,18 @@ template <typename T, Index Log2Dim, typename InteriorTest>
 void
 floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& interiorTest) {
 
+    // Floods fills a single leaf node.
+    // Starts with all voxels in NOT_VISITED.
+    // Final result is voxels in either POSITIVE, NEGATIVE, or NOT_ASSIGNED.
+    // Voxels that were categorized as NEGATIVE are negated.
+    // The NOT_ASSIGNED is all voxels within 0.75 of the zero-crossing.
+    //
+    // NOT_VISITED voxels, if outside the 0.75 band, will query the oracle
+    // to get a POSITIVE Or NEGATIVE sign (with interior being POSITIVE!)
+    //
+    // After setting a NOT_VISITED to either POSITIVE or NEGATIVE, an 8-way
+    // depth-first floodfill is done, stopping at either the 0.75 boundary
+    // or visited voxels.
     enum VoxelState {
         NOT_VISITED = 0,
         POSITIVE = 1,
@@ -3165,7 +3177,7 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
 
         // We do not assign anything for voxel close to the mesh
         // This condition is aligned with the condition in traceVoxelLine
-        if (abs(value) <= 0.75) {
+        if (std::abs(value) <= 0.75) {
             voxelState[offset] = NOT_ASSIGNED;
         } else if (voxelState[offset] == NOT_VISITED) {
 
@@ -3198,10 +3210,10 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
                         int dimIdx = (off >> dim * Log2Dim) % DIM;
                         auto neighOff = off + (1 << dim * Log2Dim) * i;
                         if ((0 < dimIdx) &&
-                            (dimIdx < DIM - 1) &&
+                            (dimIdx < (int)DIM - 1) &&
                             (voxelState[neighOff] == NOT_VISITED)) {
 
-                            if (abs(leafNode.getValue(neighOff)) <= 0.75) {
+                            if (std::abs(leafNode.getValue(neighOff)) <= 0.75) {
                                 voxelState[neighOff] = NOT_ASSIGNED;
                             } else {
                                 offsetStack.push_back({neighOff, state});
@@ -3427,6 +3439,7 @@ meshToVolume(
         /// If interior test is not provided
         if constexpr (std::is_same_v<InteriorTest, std::nullptr_t>) {
             // Determines the inside/outside state for the narrow band of voxels.
+            (void) interiorTest;       // Trigger usage.
             traceExteriorBoundaries(distTree);
         } else {
             evaluateInteriorTest(distTree, interiorTest, interiorTestStrat);
@@ -3628,8 +3641,8 @@ meshToVolume(
   float interiorBandWidth,
   int flags,
   typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid,
-  InteriorTest interiorTest,
-  InteriorTestStrategy interiorTestStrat)
+  InteriorTest /*interiorTest*/,
+  InteriorTestStrategy /*interiorTestStrat*/)
 {
     util::NullInterrupter nullInterrupter;
     return meshToVolume<GridType>(nullInterrupter, mesh, transform,
@@ -4447,14 +4460,14 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(util::NullInterrupter&, \
         const QuadAndTriangleDataAdapter<Vec3s, Vec3I>&, const openvdb::math::Transform&, \
-        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
+        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*, std::nullptr_t, InteriorTestStrategy)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(util::NullInterrupter&, \
         const QuadAndTriangleDataAdapter<Vec3s, Vec4I>&, const openvdb::math::Transform&, \
-        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
+        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*, std::nullptr_t, InteriorTestStrategy)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

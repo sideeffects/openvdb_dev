@@ -47,6 +47,12 @@ TestVolumeExecutable::testConstructionDestruction()
     CPPUNIT_ASSERT(openvdb::ax::isInitialized());
 
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
+#if LLVM_VERSION_MAJOR >= 15
+    // This will not work from LLVM 16. We'll need to fix this
+    // https://llvm.org/docs/OpaquePointers.html
+    C->setOpaquePointers(false);
+#endif
+
     std::unique_ptr<llvm::Module> M(new llvm::Module("test_module", *C));
     std::shared_ptr<const llvm::ExecutionEngine> E(llvm::EngineBuilder(std::move(M))
             .setEngineKind(llvm::EngineKind::JIT)
@@ -132,9 +138,9 @@ TestVolumeExecutable::testTreeExecutionLevel()
     CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
         executable->getActiveTileStreaming());
 
-    using NodeT0 = openvdb::FloatGrid::Accessor::NodeT0;
-    using NodeT1 = openvdb::FloatGrid::Accessor::NodeT1;
-    using NodeT2 = openvdb::FloatGrid::Accessor::NodeT2;
+    using NodeT0 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<0>;
+    using NodeT1 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<1>;
+    using NodeT2 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<2>;
 
     openvdb::FloatGrid grid;
     grid.setName("test");
@@ -316,9 +322,9 @@ TestVolumeExecutable::testTreeExecutionLevel()
 void
 TestVolumeExecutable::testActiveTileStreaming()
 {
-    using NodeT0 = openvdb::FloatGrid::Accessor::NodeT0;
-    using NodeT1 = openvdb::FloatGrid::Accessor::NodeT1;
-    using NodeT2 = openvdb::FloatGrid::Accessor::NodeT2;
+    using NodeT0 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<0>;
+    using NodeT1 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<1>;
+    using NodeT2 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<2>;
 
     //
 

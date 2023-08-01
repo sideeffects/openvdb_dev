@@ -29,12 +29,6 @@
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/points/PointDelete.h>
 
-// tbb/task_scheduler_init.h was removed in TBB 2021. The best construct to swap
-// to is tbb/global_control (for executables). global_control was only officially
-// added in TBB 2019U4 but exists in 2018 as a preview feature. To avoid more
-// compile time branching (as we still support 2018), we use it in 2018 too by
-// enabling the below define.
-#define TBB_PREVIEW_GLOBAL_CONTROL 1
 #include <tbb/global_control.h>
 
 #include <fstream>
@@ -230,7 +224,7 @@ struct ProgOptions
             .addOpt("-h")
             .addOpt("--help")
             .addOpt("-help")
-            .setDoc("print help and exit. [command] -h prints extra information.")
+            .setDoc("print help and exit (use [command] --help for more information).")
             .get();
 
     // Execute options
@@ -293,6 +287,7 @@ struct ProgOptions
                     fatal("invalid option given for --opt level");
                 }
             })
+            .setDefault(openvdb::ax::CompilerOptions::OptLevel::O3)
             .get();
 
     openvdb::ax::cli::Param<size_t> mThreads =
@@ -469,7 +464,8 @@ void shortManPage [[noreturn]] (const ProgOptions& opts, int exitStatus = EXIT_F
     std::cerr <<
     "usage: " << gProgName << " [command] [--help|-h] [-v] [<args>]\n" <<
     '\n' <<
-    "CLI utility for processing OpenVDB data using AX.\n";
+    "CLI utility for processing OpenVDB data using AX.\n" <<
+    "Available [command] modes are: [execute|analyze|functions] (Default: execute).\n";
     openvdb::ax::cli::usage(std::cerr, opts.mHelp.opts(), opts.mHelp.doc(), false);
     openvdb::ax::cli::usage(std::cerr, opts.mVerbose.opts(), opts.mVerbose.doc(), false);
     std::cerr << '\n';

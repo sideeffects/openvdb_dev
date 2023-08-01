@@ -569,14 +569,14 @@ public:
     Rgba8(Rgba8&&) = default;
     Rgba8& operator=(Rgba8&&) = default;
     Rgba8& operator=(const Rgba8&) = default;
-    __hostdev__ Rgba8() : mData{0,0,0,0} {static_assert(sizeof(uint32_t) == sizeof(Rgba8),"Unexpected sizeof");}
-    __hostdev__ Rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255u) : mData{r, g, b, a} {}
+    __hostdev__ Rgba8() : mData{{0,0,0,0}} {static_assert(sizeof(uint32_t) == sizeof(Rgba8),"Unexpected sizeof");}
+    __hostdev__ Rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255u) : mData{{r, g, b, a}} {}
     explicit __hostdev__ Rgba8(uint8_t v) : Rgba8(v,v,v,v) {}
     __hostdev__ Rgba8(float r, float g, float b, float a = 1.0f)
-        : mData{(uint8_t(0.5f + r * 255.0f)),// round to nearest
-                (uint8_t(0.5f + g * 255.0f)),// round to nearest
-                (uint8_t(0.5f + b * 255.0f)),// round to nearest
-                (uint8_t(0.5f + a * 255.0f))}// round to nearest
+        : mData{{(uint8_t(0.5f + r * 255.0f)), // round to nearest
+                 (uint8_t(0.5f + g * 255.0f)), // round to nearest
+                 (uint8_t(0.5f + b * 255.0f)), // round to nearest
+                 (uint8_t(0.5f + a * 255.0f))}}// round to nearest
     {
     }
     __hostdev__ bool operator<(const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
@@ -1134,8 +1134,10 @@ public:
 
     /// @brief Return a hash key derived from the existing coordinates.
     /// @details For details on this hash function please see the VDB paper.
+    /// The prime numbers are modified based on the ACM Transactions on Graphics paper:
+    /// "Real-time 3D reconstruction at scale using voxel hashing"
     template<int Log2N = 3 + 4 + 5>
-    __hostdev__ uint32_t hash() const { return ((1 << Log2N) - 1) & (mVec[0] * 73856093 ^ mVec[1] * 19349663 ^ mVec[2] * 83492791); }
+    __hostdev__ uint32_t hash() const { return ((1 << Log2N) - 1) & (mVec[0] * 73856093 ^ mVec[1] * 19349669 ^ mVec[2] * 83492791); }
 
     /// @brief Return the octant of this Coord
     //__hostdev__ size_t octant() const { return (uint32_t(mVec[0])>>31) | ((uint32_t(mVec[1])>>31)<<1) | ((uint32_t(mVec[2])>>31)<<2); }
@@ -1877,7 +1879,7 @@ __hostdev__ static inline uint32_t FindLowestOn(uint64_t v)
 {
     NANOVDB_ASSERT(v);
 #if (defined(__CUDA_ARCH__) || defined(__HIP__)) && defined(NANOVDB_USE_INTRINSICS)
-    return __ffsll(v);
+    return __ffsll(static_cast<unsigned long long int>(v));
 #elif defined(_MSC_VER) && defined(NANOVDB_USE_INTRINSICS)
     unsigned long index;
     _BitScanForward64(&index, v);
@@ -2592,7 +2594,7 @@ public:
     ///
     /// @note This method is only defined for IndexGrid = NanoGrid<ValueIndex>
     template <typename T = BuildType>
-    __hostdev__ typename enable_if<is_same<T, ValueIndex>::value, uint64_t>::type valueCount() const {return DataType::mData1;}
+    __hostdev__ typename enable_if<is_same<T, ValueIndex>::value, const uint64_t&>::type valueCount() const {return DataType::mData1;}
 
     /// @brief Return a const reference to the tree
     __hostdev__ const TreeT& tree() const { return *reinterpret_cast<const TreeT*>(this->treePtr()); }

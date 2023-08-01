@@ -80,6 +80,32 @@
 #define OPENVDB_UBSAN_SUPPRESS(X)
 #endif
 
+/// Macros to alias to compiler builtins which hint at critical edge selection
+/// during conditional statements.
+#if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
+#ifdef __cplusplus
+#define OPENVDB_LIKELY(x) (__builtin_expect(static_cast<bool>(x), true))
+#define OPENVDB_UNLIKELY(x) (__builtin_expect(static_cast<bool>(x), false))
+#else
+#define OPENVDB_LIKELY(x) (__builtin_expect((x), 1))
+#define OPENVDB_UNLIKELY(x) (__builtin_expect((x), 0))
+#endif
+#else
+#define OPENVDB_LIKELY(x) (x)
+#define OPENVDB_UNLIKELY(x) (x)
+#endif
+
+/// Force inline function macros. These macros do not necessary guarantee that
+/// the decorated function will be inlined, but provide the strongest vendor
+/// annotations to that end.
+#if defined(__GNUC__)
+#define OPENVDB_FORCE_INLINE __attribute__((always_inline)) inline
+#elif defined(_MSC_VER)
+#define OPENVDB_FORCE_INLINE __forceinline
+#else
+#define OPENVDB_FORCE_INLINE inline
+#endif
+
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
 /// as in the following example, to inhibit ICC remarks about unreachable code:
 /// @code

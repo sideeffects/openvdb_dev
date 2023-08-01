@@ -576,8 +576,8 @@ public:
     /// array.reserve(tree.leafCount());//this is a fast preallocation.
     /// tree.getNodes(array);
     /// @endcode
-    template<typename ArrayT> void getNodes(ArrayT& array) { mRoot.getNodes(array); }
-    template<typename ArrayT> void getNodes(ArrayT& array) const { mRoot.getNodes(array); }
+    template<typename ArrayT> void getNodes(ArrayT& array);
+    template<typename ArrayT> void getNodes(ArrayT& array) const;
     //@}
 
     /// @brief Steals all nodes of a certain type from the tree and
@@ -1038,12 +1038,7 @@ protected:
     RootNodeType mRoot; // root node of the tree
     mutable AccessorRegistry mAccessorRegistry;
     mutable ConstAccessorRegistry mConstAccessorRegistry;
-
-    static std::unique_ptr<const Name> sTreeTypeName;
 }; // end of Tree class
-
-template<typename _RootNodeType>
-std::unique_ptr<const Name> Tree<_RootNodeType>::sTreeTypeName;
 
 
 /// @brief Tree3<T, N1, N2>::Type is the type of a three-level tree
@@ -1270,6 +1265,30 @@ inline void
 Tree<RootNodeType>::writeBuffers(std::ostream &os, bool saveFloatAsHalf) const
 {
     mRoot.writeBuffers(os, saveFloatAsHalf);
+}
+
+
+template<typename RootNodeType>
+template<typename ArrayT>
+inline void
+Tree<RootNodeType>::getNodes(ArrayT& array)
+{
+    using NodeT = typename std::remove_pointer<typename ArrayT::value_type>::type;
+    static_assert(!std::is_same<NodeT, RootNodeType>::value,
+        "getNodes() does not work for the RootNode. Use Tree::root()");
+    mRoot.getNodes(array);
+}
+
+
+template<typename RootNodeType>
+template<typename ArrayT>
+inline void
+Tree<RootNodeType>::getNodes(ArrayT& array) const
+{
+    using NodeT = typename std::remove_pointer<typename ArrayT::value_type>::type;
+    static_assert(!std::is_same<NodeT, const RootNodeType>::value,
+        "getNodes() does not work for the RootNode. Use Tree::root()");
+    mRoot.getNodes(array);
 }
 
 
@@ -1805,9 +1824,9 @@ template<typename RootNodeType>
 inline const Name&
 Tree<RootNodeType>::treeType()
 {
-    static std::once_flag once;
-    std::call_once(once, []()
+    static std::string sTreeTypeName = []()
     {
+        // @todo use RootNode::NodeChain::foreach() instead
         std::vector<Index> dims;
         Tree::getNodeLog2Dims(dims);
         std::ostringstream ostr;
@@ -1815,9 +1834,9 @@ Tree<RootNodeType>::treeType()
         for (size_t i = 1, N = dims.size(); i < N; ++i) { // start from 1 to skip the RootNode
             ostr << "_" << dims[i];
         }
-        sTreeTypeName.reset(new Name(ostr.str()));
-    });
-    return *sTreeTypeName;
+        return ostr.str();
+    }();
+    return sTreeTypeName;
 }
 
 

@@ -119,6 +119,8 @@ endif()
 
 if(OPENVDB_USE_DELAYED_LOADING)
   find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
+else()
+  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS headers)
 endif()
 
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
@@ -255,6 +257,8 @@ endif()
 
 if(OPENVDB_USE_DELAYED_LOADING)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
+else()
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::headers)
 endif()
 
 if(WIN32)
@@ -383,7 +387,6 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   points/StreamCompression.cc
   points/points.cc
   util/Formats.cc
-  util/Util.cc
 )
 
 set(OPENVDB_LIBRARY_INCLUDE_FILES
@@ -417,7 +420,6 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/DDA.h
   math/FiniteDifference.h
   math/Half.h
-  math/HalfLimits.h
   math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
@@ -465,9 +467,20 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
 )
 
 set(OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES
+  points/impl/PointAttributeImpl.h
+  points/impl/PointConversionImpl.h
+  points/impl/PointCountImpl.h
+  points/impl/PointDeleteImpl.h
+  points/impl/PointGroupImpl.h
+  points/impl/PointMaskImpl.h
+  points/impl/PointMoveImpl.h
   points/impl/PointRasterizeFrustumImpl.h
   points/impl/PointRasterizeSDFImpl.h
   points/impl/PointRasterizeTrilinearImpl.h
+  points/impl/PointReplicateImpl.h
+  points/impl/PointSampleImpl.h
+  points/impl/PointScatterImpl.h
+  points/impl/PointStatisticsImpl.h
 )
 
 set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
