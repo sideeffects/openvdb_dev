@@ -61,6 +61,8 @@ jobs:
       matrix:
         # Only test unified builds (core+ax). weekly CI should test standalone
         config:
+          - { image: '2023-clang15', cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2023-clang15', cxx: 'g++',     build: 'Release', cmake: '' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   cmake: '' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2022-clang11', cxx: 'g++',     build: 'Release', cmake: '' }
@@ -69,6 +71,9 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
+      - name: pybind11
+        #if: contains(matrix.config.image, '2023') == false
+        run: ./ci/install_pybind11.sh 2.10.0
       - name: timestamp
         id: timestamp
         shell: bash
