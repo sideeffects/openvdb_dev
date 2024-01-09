@@ -1,0 +1,2 @@
+Houdini:
+    - Move reference-only sourced code to a reference subdirectory.
