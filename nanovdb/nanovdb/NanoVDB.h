@@ -2849,6 +2849,7 @@ public:
             , mParent(parent)
         {
         }
+        Iterator(const Iterator&) = default;
         Iterator&            operator=(const Iterator&) = default;
         __hostdev__ uint32_t operator*() const { return mPos; }
         __hostdev__ uint32_t pos() const { return mPos; }
@@ -4691,8 +4692,8 @@ public:
     }
 
     template<typename OpT, typename... ArgsT>
-    // __hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(std::declval<Tile&>(), std::declval<ArgsT>()...))
+    __hostdev__ auto // occasionally fails with NVCC
+//     __hostdev__ decltype(OpT::set(std::declval<Tile&>(), std::declval<ArgsT>()...))
     set(const CoordType& ijk, ArgsT&&... args)
     {
         if (Tile* tile = DataType::probeTile(ijk)) {
@@ -4816,8 +4817,8 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    // __hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(std::declval<Tile&>(), std::declval<ArgsT>()...))
+    __hostdev__ auto // occasionally fails with NVCC
+//     __hostdev__ decltype(OpT::set(std::declval<Tile&>(), std::declval<ArgsT>()...))
     setAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args)
     {
         if (Tile* tile = DataType::probeTile(ijk)) {
@@ -5287,8 +5288,8 @@ public:
     }
 
     template<typename OpT, typename... ArgsT>
-    //__hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(std::declval<InternalNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
+    __hostdev__ auto // occasionally fails with NVCC
+//     __hostdev__ decltype(OpT::set(std::declval<InternalNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
     set(const CoordType& ijk, ArgsT&&... args)
     {
         const uint32_t n = CoordToOffset(ijk);
@@ -5396,8 +5397,8 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    //__hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(std::declval<InternalNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
+    __hostdev__ auto // occasionally fails with NVCC
+//     __hostdev__ decltype(OpT::set(std::declval<InternalNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
     setAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args)
     {
         const uint32_t n = CoordToOffset(ijk);
@@ -6371,8 +6372,8 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    //__hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(std::declval<LeafNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
+    __hostdev__ auto // occasionally fails with NVCC
+//     __hostdev__ decltype(OpT::set(std::declval<LeafNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
     setAndCache(const CoordType& ijk, const AccT&, ArgsT&&... args)
     {
         return OpT::set(*this, CoordToOffset(ijk), args...);

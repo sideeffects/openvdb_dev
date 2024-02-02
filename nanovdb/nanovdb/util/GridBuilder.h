@@ -1349,6 +1349,7 @@ struct LeafNode<ValueMask>
     public:
         ValueIterator() : mParent(nullptr), mPos(1u << 3 * LOG2DIM) {}
         ValueIterator(const LeafNode* parent) :  mParent(parent), mPos(0) {NANOVDB_ASSERT(parent);}
+        ValueIterator(const ValueIterator&) = default;
         ValueIterator& operator=(const ValueIterator&) = default;
         bool operator*() const { NANOVDB_ASSERT(*this); return mParent->mValueMask.isOn(mPos);}
         Coord getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(mPos);}
@@ -1521,6 +1522,7 @@ struct LeafNode<bool>
     public:
         ValueIterator() : mParent(nullptr), mPos(1u << 3 * LOG2DIM) {}
         ValueIterator(const LeafNode* parent) :  mParent(parent), mPos(0) {NANOVDB_ASSERT(parent);}
+        ValueIterator(const ValueIterator&) = default;
         ValueIterator& operator=(const ValueIterator&) = default;
         bool operator*() const { NANOVDB_ASSERT(*this); return mParent->mValues.isOn(mPos);}
         Coord getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(mPos);}

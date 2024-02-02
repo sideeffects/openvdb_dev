@@ -17,7 +17,7 @@
 // ------------------------------------------------ Configuration -----------------------------------------------------------
 
 // platforms
-//#define PNANOVDB_C
+#define PNANOVDB_C
 //#define PNANOVDB_HLSL
 //#define PNANOVDB_GLSL
 
