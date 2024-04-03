@@ -125,30 +125,29 @@ endif()
 
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
-  if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
+  if(${TBB_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
     message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
       "is deprecated and will be removed.")
   endif()
 endif()
 
 if(USE_IMATH_HALF)
-  find_package(Imath CONFIG)
-  if (NOT TARGET Imath::Imath)
-    find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
-    if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-      if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-        message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-          "is deprecated and will be removed.")
-      endif()
-    endif()
-  else()
-    message(STATUS "Found Imath ${Imath_VERSION}")
-  endif()
+  find_package(Imath ${MINIMUM_IMATH_VERSION} REQUIRED CONFIG)
+  get_target_property(openvdb_imath_includes Imath::Imath INTERFACE_INCLUDE_DIRECTORIES)
+  message(STATUS "Found Imath: ${openvdb_imath_includes} (found suitable version \"${Imath_VERSION}\", "
+    "minimum required is \"${MINIMUM_IMATH_VERSION}\")")
+  unset(openvdb_imath_includes)
 endif()
 
 if(USE_LOG4CPLUS)
   # Find Log4CPlus libraries
   find_package(Log4cplus ${MINIMUM_LOG4CPLUS_VERSION} REQUIRED)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_LOG4CPLUS_VERSION)
+    if(${Log4cplus_VERSION} VERSION_LESS FUTURE_MINIMUM_LOG4CPLUS_VERSION)
+      message(DEPRECATION "Support for Log4cplus versions < ${FUTURE_MINIMUM_LOG4CPLUS_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
 endif()
 
 if(USE_BLOSC)
@@ -208,8 +207,7 @@ endif()
 set(OPENVDB_CORE_DEPENDENT_LIBS "")
 
 if(USE_IMATH_HALF)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    $<TARGET_NAME_IF_EXISTS:IlmBase::Half> $<TARGET_NAME_IF_EXISTS:Imath::Imath>)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Imath::Imath)
 endif()
 
 # We then choose to pull in TBB. If building aganst Houdini, TBB should
@@ -586,13 +584,19 @@ if(USE_EXPLICIT_INSTANTIATION)
 
     # Define the source file location - "<binary_dir>/instantiations/Activate.cc"
     set(INSTANTIATE_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/instantiations/${NAME}.cc")
+    set(INSTANTIATE_INPUT "${CMAKE_CURRENT_BINARY_DIR}/instantiations.in/${NAME}.cc")
 
     # The auto-generated file holds the instantiate define and the header
     # which contains all the functions to be explicitly instantiated.
-    file(WRITE ${INSTANTIATE_SOURCE}
+    file(WRITE ${INSTANTIATE_INPUT}
       "#define OPENVDB_INSTANTIATE_${UPPER_NAME}\n"
       "#include <openvdb/${HEADER}>\n"
     )
+
+    # Update the actual source file only if the content has been modified.
+    # Without this step, rerunning CMake would update the timestamp of the
+    # auto-generated file systematically, retriggering compilation.
+    configure_file(${INSTANTIATE_INPUT} ${INSTANTIATE_SOURCE} COPYONLY)
 
     # Add to the list of library source files
     # (prepend as instantiations tend to be slow to compile).
@@ -634,15 +638,6 @@ list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 
 if(MINGW)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_USE_MATH_DEFINES)
-endif()
-
-if(WIN32)
-  if(USE_IMATH_HALF)
-    # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-    if(ILMBASE_USE_STATIC_LIBS OR ("${ILMBASE_Half_LIB_TYPE}" STREQUAL STATIC))
-      list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
-    endif()
-  endif()
 endif()
 
 if(USE_LOG4CPLUS)

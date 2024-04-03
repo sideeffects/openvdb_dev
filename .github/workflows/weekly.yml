@@ -42,7 +42,7 @@ jobs:
         env:
             HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
             HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
-        run: echo "::set-output name=HOUDINI_SECRETS::${{ env.HOUDINI_CLIENT_ID != '' && env.HOUDINI_SECRET_KEY != '' }}"
+        run: echo "HOUDINI_SECRETS=${{ env.HOUDINI_CLIENT_ID != '' && env.HOUDINI_SECRET_KEY != '' }}" >> $GITHUB_OUTPUT
       - name: Skip Next Jobs
         if: steps.check.outputs.HOUDINI_SECRETS != 'true'
         run: echo "HOUDINI_CLIENT_ID and HOUDINI_SECRET_KEY GitHub Action Secrets needs to be set to install Houdini builds"
@@ -67,16 +67,26 @@ jobs:
     strategy:
       matrix:
         config:
-          - { houdini_version: '19.0', houdini_version_str: '19_0' }
           - { houdini_version: '19.5', houdini_version_str: '19_5' }
+          #- { houdini_version: '20.0', houdini_version_str: '20_0' }
       fail-fast: false
     container:
       image: aswf/ci-base:2023
     steps:
     - uses: actions/checkout@v3
+    # We bumped from the 2021 CI image to 2023 here to fix some OpenSSL issues
+    # with the Houdini download script. In so doing we broke some of the caching
+    # between this job and the jobs in houdini.yml which _don't_ use the 2023
+    # image yet. The issue is that the cache action will use zstd if it's
+    # available to zip the cache and this causes it to be inserted with a unique
+    # hash which images without zstd (i.e. the 2021/2022 images don't have
+    # access to). For now, uninstall zstd here instead of installing it
+    # everywhere and ask the LF to add zstd to the older base images.
+    - name: remove zstd
+      run: yum -y remove zstd
     - name: timestamp
       id: timestamp
-      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+      run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
     - name: download_houdini
       run: ./ci/download_houdini.sh ${{ matrix.config.houdini_version }} ON
     - name: install_houdini
@@ -85,7 +95,7 @@ jobs:
         cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: write_houdini_cache
-      uses: actions/cache@v2
+      uses: actions/cache/save@v3
       with:
         path: hou
         key: vdb-v5-houdini${{ matrix.config.houdini_version_str }}-${{ steps.timestamp.outputs.timestamp }}
@@ -104,21 +114,25 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
-      image: aswf/ci-openvdb:2022-clang14
+      # @note  we specifically use clang15.0 (not clang15) here as the newest
+      #  versions of the clang15.X containers have some issues with the GLFW
+      #  installation
+      image: aswf/ci-openvdb:2023-clang15.0
     env:
       CXX: clang++
     strategy:
       matrix:
         config:
-          - { name: 'all',   build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite',  build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
-          - { name: 'half',  build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'sse',   build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'avx',   build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=AVX' }
-          - { name: 'numpy', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_NUMPY=ON -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
-          - { name: 'asan',  build: 'asan',    components: 'core,test,axcore,axtest',          cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
-          - { name: 'ubsan', build: 'ubsan',   components: 'core,test,axcore,axtest',          cmake: '' }
-          - { name: 'c++20', build: 'Release', components: 'core,test,axcore,axtest',          cmake: '-DCMAKE_CXX_STANDARD=20' }
+          - { name: 'all',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
+          - { name: 'half',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'sse',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=SSE42' }
+          - { name: 'avx',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'numpy', build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_NUMPY=ON -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
+          - { name: 'asan',  build: 'asan',    components: 'core,test,axcore,axtest',                        cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
+          - { name: 'ubsan', build: 'ubsan',   components: 'core,test,axcore,axtest',                        cmake: '' }
+          - { name: 'c++20', build: 'Release', components: 'core,test,axcore,axtest',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
+          - { name: 'conf',  build: 'Release', components: 'core,python,bin,view,render,test,axcore,axtest', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
@@ -158,8 +172,7 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-dev libgtest-dev libcppunit-dev pybind11-dev
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            ./ci/install_macos_ax.sh 15
-            brew install googletest
+            ./ci/install_macos.sh 15
           else
             echo "$RUNNER_OS not supported"; exit 1
           fi
@@ -243,7 +256,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: macos-11
+    runs-on: macos-latest
     name: macos-cxx:${{ matrix.config.cxx }}-llvm:${{ matrix.config.llvm }}-${{ matrix.config.build }}
     env:
       CXX: ${{ matrix.config.cxx }}
@@ -257,7 +270,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
-        run: ./ci/install_macos_ax.sh ${{ matrix.config.llvm }}
+        run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
       - name: build
         run: >
           ./ci/build.sh -v
@@ -343,7 +356,7 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-blosc:${{ matrix.blosc }}
     container:
-      image: aswf/ci-base:2021
+      image: aswf/ci-base:2023
     strategy:
       matrix:
         blosc: ['1.18.0','1.19.0','1.20.0','1.21.0']
