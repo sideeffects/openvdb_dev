@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @author Nick Avramoussis
 ///
@@ -12,6 +12,7 @@
 
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/tools/Prune.h>
+#include <openvdb/util/Assert.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

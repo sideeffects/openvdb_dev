@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file SOP_OpenVDB_Merge.cc
 ///
@@ -11,7 +11,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/PointUtils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-#include <openvdb_houdini/GEO_PrimVDB.h>
+#include <GEO/GEO_PrimVDB.h>
 
 #include <openvdb/points/PointDataGrid.h> // points::PointDataGrid
 #include <openvdb/tools/GridTransformer.h> // tools::replaceToMatch()

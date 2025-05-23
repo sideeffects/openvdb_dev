@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file GeometryUtil.h
 /// @author FX R&D Simulation team
@@ -15,6 +15,7 @@
 #include <openvdb/util/Util.h> // for openvdb::util::COORD_OFFSETS
 
 #include <GU/GU_Detail.h>
+#include <GEO/GEO_Primitive.h>
 
 #include <algorithm> // for std::max/min()
 #include <memory>

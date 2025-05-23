@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file codegen/String.h
 ///
@@ -14,10 +14,10 @@
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 
 #include <cstring>
 #include <cstdlib>
-#include <cassert>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -41,7 +41,7 @@ struct String
     String(const std::string& str) : String(str.c_str(), str.size()) {}
     String(const char* str, const int64_t size)
     {
-        assert(str != nullptr);
+        OPENVDB_ASSERT(str != nullptr);
         this->ptr = this->SSO; // for the isLocal check in alloc
         this->reset(str, size);
     }

@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file SOP_OpenVDB_Activate.cc
 ///
@@ -529,8 +529,6 @@ public:
     template <typename NodeT>
     bool operator()(NodeT &node, size_t idx) const
     {
-        using ChildT = typename NodeT::ChildNodeType;
-
         for (auto iter = node.beginChildAll(); iter; ++iter)
         {
             typename NodeT::ChildNodeType    *child;

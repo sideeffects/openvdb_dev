@@ -1,11 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef OPENVDB_AX_CODEGEN_CODECS_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_CODECS_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 
 #include "openvdb_ax/ast/Tokens.h"
 #include "openvdb_ax/codegen/FunctionTypes.h"
@@ -47,11 +48,11 @@ public:
     , mDecoder(std::move(decoder))
     , mFlag(flag) {
 #ifndef NDEBUG
-        assert(!mEncoder->list().empty());
-        assert(!mDecoder->list().empty());
-        assert(mEncoder->list().size() == mDecoder->list().size());
-        for (const auto& F : mEncoder->list()) {
-            assert(F->size() == 1 || F->size() == 2);
+        OPENVDB_ASSERT(!mEncoder->list().empty());
+        OPENVDB_ASSERT(!mDecoder->list().empty());
+        OPENVDB_ASSERT(mEncoder->list().size() == mDecoder->list().size());
+        for ([[maybe_unused]] const auto& F : mEncoder->list()) {
+            OPENVDB_ASSERT(F->size() == 1 || F->size() == 2);
         }
 #endif
     }

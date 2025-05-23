@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file SOP_NodeVDB.cc
 /// @author FX R&D OpenVDB team
@@ -10,8 +10,8 @@
 #include <openvdb/points/PointDataGrid.h>
 #include "PointUtils.h"
 #include "Utils.h"
-#include "GEO_PrimVDB.h"
-#include "GU_PrimVDB.h"
+#include <GEO/GEO_PrimVDB.h>
+#include <GU/GU_PrimVDB.h>
 #include <GU/GU_Detail.h>
 #include <GU/GU_PrimPoly.h>
 #include <OP/OP_NodeInfoParms.h>

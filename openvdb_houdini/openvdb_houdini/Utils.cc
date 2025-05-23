@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file Utils.cc
 /// @author FX R&D Simulation team
@@ -8,7 +8,7 @@
 #include "Utils.h"
 
 #include <houdini_utils/ParmFactory.h>
-#include "GEO_PrimVDB.h"
+#include <GEO/GEO_PrimVDB.h>
 #include <GU/GU_Detail.h>
 #include <UT/UT_String.h>
 #include <UT/UT_Version.h>

@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -111,6 +111,7 @@ else()
     TestInt32Metadata.cc
     TestInt64Metadata.cc
     TestInternalOrigin.cc
+    TestInternalNode.cc
     TestLaplacian.cc
     TestLeaf.cc
     TestLeafBool.cc
@@ -118,6 +119,7 @@ else()
     TestLeafManager.cc
     TestLeafMask.cc
     TestLeafOrigin.cc
+    TestLevelSetFilter.cc
     TestLevelSetRayIntersector.cc
     TestLevelSetUtil.cc
     TestLinearInterp.cc
@@ -166,6 +168,7 @@ else()
     TestQuantizedUnitVec.cc
     TestQuat.cc
     TestRay.cc
+    TestRootNode.cc
     TestStats.cc
     TestStencils.cc
     TestStream.cc
@@ -221,15 +224,16 @@ endif()
 target_link_libraries(vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS})
 add_test(NAME vdb_unit_test COMMAND $<TARGET_FILE:vdb_test> -v)
 
-# For the undefined behaviour sanitizer, add the suppression file and
-# additional options
-
+# For the sanitizers, add the suppression files and additional options
 get_filename_component(PATH_TO_PROJECT_ROOT ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
 get_filename_component(PATH_TO_PROJECT_ROOT ${PATH_TO_PROJECT_ROOT} DIRECTORY)
 get_filename_component(PATH_TO_PROJECT_ROOT ${PATH_TO_PROJECT_ROOT} DIRECTORY)
+set(LSAN_SUPRESSION_FILE ${PATH_TO_PROJECT_ROOT}/cmake/scripts/lsan.supp)
 set(UBSAN_SUPRESSION_FILE ${PATH_TO_PROJECT_ROOT}/cmake/scripts/ubsan.supp)
 
-set_tests_properties(vdb_unit_test PROPERTIES
-    ENVIRONMENT
-      "$<$<CONFIG:UBSAN>:UBSAN_OPTIONS=halt_on_error=1 report_error_type=1 suppressions=${UBSAN_SUPRESSION_FILE}>")
+set(UBSAN_OPTS "$<$<CONFIG:UBSAN>:UBSAN_OPTIONS=halt_on_error=1 report_error_type=1 suppressions=${UBSAN_SUPRESSION_FILE}>")
+set(LSAN_OPTS  "$<$<CONFIG:LSAN>:LSAN_OPTIONS=suppressions=${LSAN_SUPRESSION_FILE}>")
+set(ASAN_OPTS  "$<$<CONFIG:ASAN>:LSAN_OPTIONS=suppressions=${LSAN_SUPRESSION_FILE}>")
 
+set_tests_properties(vdb_unit_test PROPERTIES
+    ENVIRONMENT "$<JOIN:${UBSAN_OPTS};${LSAN_OPTS};${ASAN_OPTS}, >")

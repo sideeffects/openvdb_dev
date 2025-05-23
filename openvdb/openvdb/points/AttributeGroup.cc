@@ -1,9 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file points/AttributeGroup.cc
 
 #include "AttributeGroup.h"
+#include <openvdb/util/Assert.h>
 
 
 namespace openvdb {
@@ -21,7 +22,7 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& offs
         : mArray(array)
         , mBitMask(static_cast<GroupType>(1 << offset))
 {
-    assert(isGroup(mArray));
+    OPENVDB_ASSERT(isGroup(mArray));
 
     // load data if delay-loaded
 
@@ -34,7 +35,7 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& bitM
     : mArray(array)
     , mBitMask(bitMask)
 {
-    assert(isGroup(mArray));
+    OPENVDB_ASSERT(isGroup(mArray));
 
     // load data if delay-loaded
 
@@ -62,7 +63,7 @@ bool GroupHandle::getUnsafe(Index n) const
 GroupWriteHandle::GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset)
     : GroupHandle(array, offset)
 {
-    assert(isGroup(mArray));
+    OPENVDB_ASSERT(isGroup(mArray));
 }
 
 

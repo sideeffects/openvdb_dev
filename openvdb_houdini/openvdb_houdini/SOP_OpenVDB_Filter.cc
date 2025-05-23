@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file SOP_OpenVDB_Filter.cc
 ///
@@ -406,7 +406,6 @@ struct FilterOp
     void operator()(GridT& grid)
     {
         using ValueT = typename GridT::ValueType;
-        using TreeType = typename GridT::TreeType;
 
         int radius = mParms.radius;
         if (mParms.useWorldRadius) {

@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file codegen/PointLeafLocalData.h
 ///
@@ -17,6 +17,7 @@
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointGroup.h>
+#include <openvdb/util/Assert.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -91,13 +92,13 @@ struct PointLeafLocalData
 #endif
 
         if (mArrays.empty() || mOffset == maxGroupsInArray) {
-            assert(mPointCount < static_cast<size_t>(std::numeric_limits<openvdb::Index>::max()));
+            OPENVDB_ASSERT(mPointCount < static_cast<size_t>(std::numeric_limits<openvdb::Index>::max()));
             mArrays.emplace_back(new GroupArrayT(static_cast<openvdb::Index>(mPointCount)));
             mOffset = 0;
         }
 
         GroupArrayT* array = mArrays.back().get();
-        assert(array);
+        OPENVDB_ASSERT(array);
 
         std::unique_ptr<GroupHandleT>& handle = mHandles[name];
         handle.reset(new GroupHandleT(*array, mOffset++));

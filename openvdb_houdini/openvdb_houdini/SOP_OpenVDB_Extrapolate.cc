@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 // @file SOP_OpenVDB_Extrapolate.cc
 //
@@ -576,7 +576,6 @@ SOP_OpenVDB_Extrapolate::Cache::process(
     using namespace openvdb::tools;
 
     using SamplerT = openvdb::tools::GridSampler<ExtGridT, openvdb::tools::BoxSampler>;
-    using ExtValueT = typename ExtGridT::ValueType;
 
     typename FSGridT::Ptr fsGrid = openvdb::gridPtrCast<FSGridT>(lsPrim->getGridPtr());
 

@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file codegen/SymbolTable.h
 ///
@@ -13,6 +13,7 @@
 #define OPENVDB_AX_CODEGEN_SYMBOL_TABLE_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 
 #include <llvm/IR/Value.h>
 
@@ -178,7 +179,7 @@ struct SymbolTableBlocks
         // reverse the iterator (which also make it point to the preceding
         // value, hence the crement)
 
-        assert(it != mTables.end());
+        OPENVDB_ASSERT(it != mTables.end());
         MapType::const_reverse_iterator iter(++it);
 
         for (; iter != mTables.crend(); ++iter) {

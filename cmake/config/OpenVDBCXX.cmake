@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 ###############################################################################
 
@@ -184,20 +184,23 @@ if(OPENVDB_CXX_STRICT)
   add_compile_options("$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,9.3.0>>:-Wimplicit-fallthrough>")
   # Only check global constructors for libraries (we should really check for
   # executables too but gtest relies on these types of constructors for its
-  # framework).
-  add_compile_options("$<$<AND:$<NOT:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-Wglobal-constructors>")
+  # framework). nanobind also incorporates these constructors so skip it as well.
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>>>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-Wglobal-constructors>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-sign-conversion>")
   # GNU
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Werror>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wall>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wextra>")
-  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-pedantic>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wcast-align>")
-  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wcast-qual>")
-  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wconversion>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wdisabled-optimization>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Woverloaded-virtual>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wnon-virtual-dtor>")
+  # Disable select warnings for the nanobind static library
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-pedantic>")
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-Wcast-qual>")
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-Wconversion>")
+  add_compile_options("$<$<AND:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-Wno-unused-variable>")
+  add_compile_options("$<$<AND:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-Wno-unused-but-set-parameter>")
 else()
   # NO OPENVDB_CXX_STRICT, suppress some warnings
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -245,7 +248,7 @@ if(CMAKE_BUILD_TYPE EQUAL coverage)
 endif()
 
 # Note that the thread, address and memory sanitizers are incompatible with each other
-set(EXTRA_BUILD_TYPES coverage tsan asan lsan msan ubsan)
+set(EXTRA_BUILD_TYPES coverage tsan asan lsan msan ubsan abicheck)
 
 # Set all build flags to empty (unless they have been provided)
 
@@ -304,11 +307,21 @@ add_link_options("$<$<AND:$<CONFIG:MSAN>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleCl
 add_compile_options("$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fsanitize=undefined>")
 add_link_options("$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fsanitize=undefined>")
 
+# ABI Check. This build type is expected to work with the abi-dumper/abi-compliance-checker
+# binaries which expect specific debug information. In particular, for GCC versions >= 11
+# we have to explicitly select dwarf versions < 5 as the abi-dumper doesn't support dwarf5
+# and will always incorrectly report successful ABI checks
+#   https://github.com/lvc/abi-dumper/issues/33
+add_compile_options("$<$<CONFIG:ABICHECK>:-gdwarf-4;-g3;-ggdb;-Og>")
+
 # CMAKE_BUILD_TYPE is ignored for multi config generators i.e. MSVS
 
 get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(NOT _isMultiConfig)
   message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
+endif()
+if(OPENVDB_ENABLE_ASSERTS)
+  message(STATUS "OpenVDB asserts are ENABLED")
 endif()
 
 # Intialize extra build type targets where possible

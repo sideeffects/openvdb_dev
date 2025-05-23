@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -22,6 +22,7 @@
 #include <openvdb/io/Stream.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/util/Formats.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/LevelSetAdvect.h>
@@ -46,14 +47,15 @@
 #include <openvdb/tools/Mask.h> // for tools::interiorMask()
 #include <openvdb/tools/MultiResGrid.h>
 #include <openvdb/tools/SignedFloodFill.h>
+#include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointCount.h>
 
 #ifdef VDB_TOOL_USE_NANO
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/CreateNanoGrid.h>
-#include <nanovdb/util/NanoToOpenVDB.h>
+#include <nanovdb/io/IO.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
+#include <nanovdb/tools/NanoToOpenVDB.h>
 #endif
 
 #ifdef VDB_TOOL_USE_EXR
@@ -66,6 +68,10 @@
 
 #ifdef VDB_TOOL_USE_PNG
 #include <png.h>
+#endif
+
+#ifdef VDB_TOOL_USE_PDAL
+#include <pdal/pdal.hpp>
 #endif
 
 #ifdef VDB_TOOL_USE_JPG
@@ -363,14 +369,14 @@ void Tool::init()
 
   mParser.addAction(
       "read", "i", "Read one or more geometry or VDB files from disk or STDIN.",
-    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
+    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|off|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
      {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
       "write", "o", "Write list of geometry, VDB or config files to disk or STDOUT",
-    {{"files", "", "{file|stdout}.{obj|ply|stl|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
+    {{"files", "", "{file|stdout}.{obj|ply|stl|off|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
@@ -868,7 +874,7 @@ void Tool::init()
 void Tool::help()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "help");
+  OPENVDB_ASSERT(name == "help");
   try {
     mParser.printAction();
     const VecS actions = mParser.getVec<std::string>("actions");
@@ -919,8 +925,8 @@ std::string Tool::examples() const
 {
     const int w = 16;
     std::stringstream ss;
-    ss << std::left << std::setw(w) << "Surface points:" << mCmdName << " -read points.[obj/ply/stl/pts] -points2ls d=256 r=2.0 w=3 -dilate r=2 -gauss i=1 w=1 -erode r=2 -ls2m a=0.25 -write output.[ply/obj/stl]\n";
-    ss << std::left << std::setw(w) << "Convert mesh:  " << mCmdName << " -read mesh.[ply/obj] -mesh2ls d=256 -write output.vdb config.txt\n";
+    ss << std::left << std::setw(w) << "Surface points:" << mCmdName << " -read points.[obj/ply/stl/off/pts] -points2ls d=256 r=2.0 w=3 -dilate r=2 -gauss i=1 w=1 -erode r=2 -ls2m a=0.25 -write output.[ply/obj/stl]\n";
+    ss << std::left << std::setw(w) << "Convert mesh:  " << mCmdName << " -read mesh.[ply/obj/off] -mesh2ls d=256 -write output.vdb config.txt\n";
     ss << std::left << std::setw(w) << "Config example:" << mCmdName << " -config config.txt\n";
     return ss.str();
 }
@@ -929,7 +935,7 @@ std::string Tool::examples() const
 
 void Tool::clear()
 {
-  assert(mParser.getAction().name == "clear");
+  OPENVDB_ASSERT(mParser.getAction().name == "clear");
   if (mParser.get<std::string>("geo") == "*") {
     mGeom.clear();
   } else {
@@ -955,9 +961,9 @@ void Tool::clear()
 
 void Tool::read()
 {
-  assert(mParser.getAction().name == "read");
+  OPENVDB_ASSERT(mParser.getAction().name == "read");
   for (auto &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,stl", "vdb", "nvdb"})) {
+    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl", "vdb", "nvdb"})) {
     case 1:
       this->readGeo(fileName);
       break;
@@ -968,6 +974,14 @@ void Tool::read()
       this->readNVDB(fileName);
       break;
     default:
+#if VDB_TOOL_USE_PDAL
+    pdal::StageFactory factory;
+    if (factory.inferReaderDriver(fileName) != "")
+    {
+      this->readGeo(fileName);
+      break;
+    }
+#endif
       throw std::invalid_argument("File \""+fileName+"\" has an invalid extension");
       break;
     }
@@ -978,7 +992,7 @@ void Tool::read()
 
 void Tool::readGeo(const std::string &fileName)
 {
-  assert(mParser.getAction().name == "read");
+  OPENVDB_ASSERT(mParser.getAction().name == "read");
   if (mParser.verbose>1) std::cerr << "Reading geometry from \"" << fileName << "\"\n";
   if (mParser.verbose) mTimer.start("Read geometry");
   Geometry::Ptr geom(new Geometry());
@@ -997,7 +1011,7 @@ void Tool::readGeo(const std::string &fileName)
 
 void Tool::readVDB(const std::string &fileName)
 {
-  assert(mParser.getAction().name == "read");
+  OPENVDB_ASSERT(mParser.getAction().name == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
   if (gridNames.empty()) throw std::invalid_argument("readVDB: no grids names specified");
   GridPtrVecPtr grids;
@@ -1032,7 +1046,7 @@ void Tool::readVDB(const std::string &fileName)
 #ifdef VDB_TOOL_USE_NANO
 void Tool::readNVDB(const std::string &fileName)
 {
-  assert(mParser.getAction().name == "read");
+  OPENVDB_ASSERT(mParser.getAction().name == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
   if (gridNames.empty()) throw std::invalid_argument("readNVDB: no grids names specified");
   std::vector<nanovdb::GridHandle<>> grids;
@@ -1048,7 +1062,7 @@ void Tool::readNVDB(const std::string &fileName)
   const size_t count = mGrid.size();
   if (grids.size()) {
     for (const auto& gridHandle : grids) {
-      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::nanoToOpenVDB(gridHandle));
+      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::tools::nanoToOpenVDB(gridHandle));
     }
   } else if (mParser.verbose>0) {
     std::cerr << "readVDB: no vdb grids in \"" << fileName << "\"";
@@ -1070,7 +1084,7 @@ void Tool::readNVDB(const std::string&)
 
 void Tool::config()
 {
-    assert(mParser.getAction().name == "config");
+    OPENVDB_ASSERT(mParser.getAction().name == "config");
     const bool update  = mParser.get<bool>("update");
     const bool execute = mParser.get<bool>("execute");
     std::string line;
@@ -1119,9 +1133,9 @@ void Tool::config()
 
 void Tool::write()
 {
-  assert(mParser.getAction().name == "write");
+  OPENVDB_ASSERT(mParser.getAction().name == "write");
   for (std::string &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,stl,abc", "vdb", "nvdb", "txt"})) {
+    switch (findFileExt(fileName, {"geo,obj,ply,stl,off,abc", "vdb", "nvdb", "txt"})) {
     case 1:
       this->writeGeo(fileName);
       break;
@@ -1146,7 +1160,7 @@ void Tool::write()
 void Tool::writeVDB(const std::string &fileName)
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "write");
+  OPENVDB_ASSERT(name == "write");
   try {
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
@@ -1212,7 +1226,7 @@ void Tool::writeVDB(const std::string &fileName)
 void Tool::writeNVDB(const std::string &fileName)
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "write");
+  OPENVDB_ASSERT(name == "write");
   try {
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
@@ -1248,26 +1262,26 @@ void Tool::writeNVDB(const std::string &fileName)
       throw std::invalid_argument("writeNVDB: unsupported bits \""+bits+"\"");
     }
 
-    nanovdb::StatsMode sMode = nanovdb::StatsMode::Default;
+    nanovdb::tools::StatsMode sMode = nanovdb::tools::StatsMode::Default;
     if (stats == "none") {
-      sMode = nanovdb::StatsMode::Disable;
+      sMode = nanovdb::tools::StatsMode::Disable;
     } else if (stats == "bbox") {
-      sMode = nanovdb::StatsMode::BBox;
+      sMode = nanovdb::tools::StatsMode::BBox;
     } else if (stats == "extrema") {
-      sMode = nanovdb::StatsMode::MinMax;
+      sMode = nanovdb::tools::StatsMode::MinMax;
     } else if (stats == "all") {
-      sMode = nanovdb::StatsMode::All;
+      sMode = nanovdb::tools::StatsMode::All;
     } else if (stats != "") {
       throw std::invalid_argument("writeNVDB: unsupported stats \""+stats+"\"");
     }
 
-    nanovdb::ChecksumMode cMode = nanovdb::ChecksumMode::Default;
+    nanovdb::CheckMode cMode = nanovdb::CheckMode::Default;
     if (checksum == "none") {
-      cMode = nanovdb::ChecksumMode::Disable;
+      cMode = nanovdb::CheckMode::Disable;
     } else if (checksum == "partial") {
-      cMode = nanovdb::ChecksumMode::Partial;
+      cMode = nanovdb::CheckMode::Partial;
     } else if (checksum == "full") {
-      cMode = nanovdb::ChecksumMode::Full;
+      cMode = nanovdb::CheckMode::Full;
     } else if (checksum != "") {
       throw std::invalid_argument("writeNVDB: unsupported checksum \""+checksum+"\"");
     }
@@ -1288,21 +1302,21 @@ void Tool::writeNVDB(const std::string &fileName)
         using SrcGridT = openvdb::FloatGrid;
         switch (qMode){
         case nanovdb::GridType::Fp4:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::Fp8:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::Fp16:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::FpN:
           if (absolute) {
-            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::AbsDiff(tolerance));
+            return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::tools::AbsDiff(tolerance));
           } else {
-            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::RelDiff(tolerance));
+            return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::tools::RelDiff(tolerance));
           }
         default: break;// 32 bit float grids are handled below
         }// end of switch
       }
-      return nanovdb::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
+      return nanovdb::tools::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
     };// openToNano
 
     if (fileName=="stdout.nvdb") {
@@ -1336,7 +1350,7 @@ void Tool::writeNVDB(const std::string&)
 
 void Tool::writeGeo(const std::string &fileName)
 {
-  assert(mParser.getAction().name == "write");
+  OPENVDB_ASSERT(mParser.getAction().name == "write");
   const int age = mParser.get<int>("geo");
   const bool keep = mParser.get<bool>("keep");
   if (mParser.verbose>1) std::cerr << "Writing geometry to \"" << fileName << "\"\n";
@@ -1352,7 +1366,7 @@ void Tool::writeGeo(const std::string &fileName)
 
 void Tool::writeConf(const std::string &fileName)
 {
-  assert(mParser.getAction().name == "write");
+  OPENVDB_ASSERT(mParser.getAction().name == "write");
   if (mParser.verbose>1) std::cerr << "Writing configuration to \"" << fileName << "\"\n";
   std::ofstream file(fileName);
   if (!file.is_open()) throw std::invalid_argument("writeConf: unable to open \""+fileName+"\"");
@@ -1369,7 +1383,7 @@ void Tool::writeConf(const std::string &fileName)
 void Tool::vdbToPoints()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "vdb2points");
+  OPENVDB_ASSERT(name == "vdb2points");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -1411,7 +1425,7 @@ void Tool::vdbToPoints()
 void Tool::pointsToVdb()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "points2vdb");
+  OPENVDB_ASSERT(name == "points2vdb");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("geo");
@@ -1420,6 +1434,7 @@ void Tool::pointsToVdb()
     const int bits = mParser.get<int>("bits");
     std::string grid_name = mParser.get<std::string>("name");
     using GridT = points::PointDataGrid;
+    using IdGridT = tools::PointIndexGrid;
     if (mParser.verbose) mTimer.start("Points to VDB");
     auto it = this->getGeom(age);
     Points points((*it)->vtx());
@@ -1427,18 +1442,47 @@ void Tool::pointsToVdb()
     auto xform = math::Transform::createLinearTransform(voxelSize);
 
     GridT::Ptr grid;
+    IdGridT::Ptr indexGrid;
+
+    points::PointAttributeVector<openvdb::Vec3s> positionsWrapper((*it)->vtx());
+    openvdb::NamePair rgbAttribute ;
     switch (bits) {
     case 8:
-      grid = points::createPointDataGrid<points::FixedPointCodec</*1-byte=*/true>, GridT>((*it)->vtx(), *xform);
+      indexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(positionsWrapper, *xform);
+      grid = points::createPointDataGrid<points::FixedPointCodec</*1-byte=*/true>, GridT>(*indexGrid, positionsWrapper, *xform);
+      openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::registerType();
+      rgbAttribute =
+        openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::attributeType();
+      openvdb::points::appendAttribute(grid->tree(), "Cd", rgbAttribute);
       break;
     case 16:
-      grid = points::createPointDataGrid<points::FixedPointCodec</*1-byte=*/false>, GridT>((*it)->vtx(), *xform);
+      indexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(positionsWrapper, *xform);
+      grid = points::createPointDataGrid<points::FixedPointCodec</*1-byte=*/false>, GridT>(*indexGrid, positionsWrapper, *xform);
+      openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::registerType();
+      rgbAttribute =
+        openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::attributeType();
+      openvdb::points::appendAttribute(grid->tree(), "Cd", rgbAttribute);
       break;
     case 32:
-      grid = points::createPointDataGrid<points::NullCodec, GridT>((*it)->vtx(), *xform);
+      indexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(positionsWrapper, *xform);
+      grid = points::createPointDataGrid<points::NullCodec, GridT>(*indexGrid, positionsWrapper, *xform);
+
+      openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::registerType();
+      rgbAttribute =
+        openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::attributeType();
+      openvdb::points::appendAttribute(grid->tree(), "Cd", rgbAttribute);
       break;
     default:
       throw std::invalid_argument("pointsToVdb: unsupported bit-width: "+std::to_string(bits));
+    }
+
+    if ((*it)->rgb().size() == (*it)->vtx().size()) {
+
+      points::PointAttributeVector<Vec3s> rgbWrapper((*it)->rgb());
+      points::populateAttribute<openvdb::points::PointDataTree,
+        openvdb::tools::PointIndexTree, openvdb::points::PointAttributeVector<Vec3s>>(
+            grid->tree(), indexGrid->tree(), "Cd", rgbWrapper);
+
     }
     if (grid_name.empty()) grid_name = "points2vdb_"+(*it)->getName();
     grid->setName(grid_name);
@@ -1455,7 +1499,7 @@ void Tool::pointsToVdb()
 void Tool::transform()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "transform");
+  OPENVDB_ASSERT(name == "transform");
   try {
     mParser.printAction();
     const auto vdb_age = mParser.getVec<int>("vdb");
@@ -1514,7 +1558,7 @@ void Tool::transform()
 void Tool::levelSetToFog()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "ls2fog");
+  OPENVDB_ASSERT(name == "ls2fog");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -1541,7 +1585,7 @@ void Tool::levelSetToFog()
 void Tool::isoToLevelSet()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "iso2ls");
+  OPENVDB_ASSERT(name == "iso2ls");
   try {
     mParser.printAction();
     const VecI age = mParser.getVec<int>("vdb");
@@ -1593,7 +1637,7 @@ float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
 void Tool::meshToLevelSet()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "mesh2ls");
+  OPENVDB_ASSERT(name == "mesh2ls");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -1632,7 +1676,7 @@ void Tool::meshToLevelSet()
 void Tool::particlesToLevelSet()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "points2ls");
+  OPENVDB_ASSERT(name == "points2ls");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -1707,7 +1751,7 @@ typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
 void Tool::offsetLevelSet()
 {
   const std::string &name = mParser.getAction().name;
-  assert(findMatch(name, {"dilate", "erode", "open", "close"}));
+  OPENVDB_ASSERT(findMatch(name, {"dilate", "erode", "open", "close"}));
   try {
     mParser.printAction();
     float radius = mParser.get<float>("radius");
@@ -1750,7 +1794,7 @@ void Tool::offsetLevelSet()
 void Tool::filterLevelSet()
 {
   const std::string &name = mParser.getAction().name;
-  assert(findMatch(name, {"gauss", "mean", "median"}));
+  OPENVDB_ASSERT(findMatch(name, {"gauss", "mean", "median"}));
   try {
     mParser.printAction();
     const int nIter = mParser.get<int>("iter");
@@ -1789,7 +1833,7 @@ void Tool::filterLevelSet()
 void Tool::pruneLevelSet()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "prune");
+  OPENVDB_ASSERT(name == "prune");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -1810,7 +1854,7 @@ void Tool::pruneLevelSet()
 void Tool::floodLevelSet()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "flood");
+  OPENVDB_ASSERT(name == "flood");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -1831,7 +1875,7 @@ void Tool::floodLevelSet()
 void Tool::compute()
 {
   const std::string &name = mParser.getAction().name;
-  assert(findMatch(name, {"cpt","div","curl","length","grad","curvature"}));
+  OPENVDB_ASSERT(findMatch(name, {"cpt","div","curl","length","grad","curvature"}));
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -1899,7 +1943,7 @@ void Tool::compute()
 void Tool::composite()
 {
   const std::string &name = mParser.getAction().name;
-  assert(findMatch(name, {"min","max","sum"}));
+  OPENVDB_ASSERT(findMatch(name, {"min","max","sum"}));
   try {
     mParser.printAction();
     const VecI ij = mParser.getVec<int>("vdb");
@@ -1944,7 +1988,7 @@ void Tool::composite()
 void Tool::csg()
 {
   const std::string &name = mParser.getAction().name;
-  assert(findMatch(name, {"union", "intersection", "difference"}));
+  OPENVDB_ASSERT(findMatch(name, {"union", "intersection", "difference"}));
   try {
     mParser.printAction();
     const VecI ij = mParser.getVec<int>("vdb");
@@ -2021,7 +2065,7 @@ void Tool::csg()
 void Tool::levelSetToMesh()
 {
   const std::string &action_name = mParser.getAction().name;
-  assert(action_name == "ls2mesh");
+  OPENVDB_ASSERT(action_name == "ls2mesh");
   try {
     mParser.printAction();
     const double adaptivity = mParser.get<float>("adapt");
@@ -2098,7 +2142,7 @@ void Tool::levelSetToMesh()
 void Tool::levelSetSphere()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "sphere");
+  OPENVDB_ASSERT(name == "sphere");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -2123,7 +2167,7 @@ void Tool::levelSetSphere()
 void Tool::levelSetPlatonic()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "platonic");
+  OPENVDB_ASSERT(name == "platonic");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -2162,7 +2206,7 @@ void Tool::levelSetPlatonic()
 void Tool::multires()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "multires");
+  OPENVDB_ASSERT(name == "multires");
   try {
     mParser.printAction();
     const int levels = mParser.get<int>("levels");
@@ -2191,7 +2235,7 @@ void Tool::multires()
 void Tool::expandLevelSet()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "expand");
+  OPENVDB_ASSERT(name == "expand");
   try {
     mParser.printAction();
     const int dilate = mParser.get<int>("dilate");
@@ -2217,7 +2261,7 @@ void Tool::expandLevelSet()
 void Tool::segment()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "segment");
+  OPENVDB_ASSERT(name == "segment");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -2250,7 +2294,7 @@ void Tool::segment()
 void Tool::resample()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "resample");
+  OPENVDB_ASSERT(name == "resample");
   try {
     mParser.printAction();
     const VecI age = mParser.getVec<int>("vdb");
@@ -2303,7 +2347,7 @@ void Tool::resample()
 void Tool::scatter()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "scatter");
+  OPENVDB_ASSERT(name == "scatter");
   try {
     mParser.printAction();
     const Index64 count = mParser.get<int>("count");
@@ -2355,7 +2399,7 @@ void Tool::scatter()
 void Tool::enright()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "enright");
+  OPENVDB_ASSERT(name == "enright");
   try {
     mParser.printAction();
     const Vec3d translate = mParser.getVec3<double>("translate");
@@ -2447,7 +2491,7 @@ GridBase::Ptr Tool::clip(const VecF &v, int age, const GridType &input)
 void Tool::clip()
 {
   const std::string &name = mParser.getAction().name;
-  assert(name == "clip");
+  OPENVDB_ASSERT(name == "clip");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -2621,7 +2665,7 @@ void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
 
 void Tool::render()
 {
-  assert(mParser.getAction().name == "render");
+  OPENVDB_ASSERT(mParser.getAction().name == "render");
   const VecS fileNames = mParser.getVec<std::string>("files");
   const int age = mParser.get<int>("vdb");
   const bool keep = mParser.get<bool>("keep");
@@ -2783,7 +2827,7 @@ void Tool::print_args(std::ostream& os) const
 
 void Tool::print(std::ostream& os) const
 {
-  assert(mParser.getAction().name == "print");
+  OPENVDB_ASSERT(mParser.getAction().name == "print");
 
   if (mParser.verbose>1) {
     os << "\n" << std::setw(40) << std::setfill('=') << "> Actions <" << std::setw(40) << "\n";

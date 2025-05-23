@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -52,9 +52,9 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 11)
+set(OpenVDB_MAJOR_VERSION 12)
 set(OpenVDB_MINOR_VERSION 0)
-set(OpenVDB_PATCH_VERSION 0)
+set(OpenVDB_PATCH_VERSION 1)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -64,7 +64,7 @@ project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
 include(CMakeDependentOption)
 include(GNUInstallDirs)
 
-# todo epydoc and pdflatex
+# Components
 option(OPENVDB_BUILD_CORE "Enable the core OpenVDB library. Both static and shared versions are enabled by default" ON)
 option(OPENVDB_BUILD_BINARIES "Enable the vdb binaries. Only vdb_print is enabled by default" ON)
 option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
@@ -72,21 +72,34 @@ option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
-
+option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_BUILD_AX "Build the OpenVDB AX library. Turns ON if USE_AX is ON." ${USE_AX})
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
-
 option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
 
-option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
-option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
+# Global options
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
+option(OPENVDB_ENABLE_ASSERTS "Build with asserts in OpenVDB code enabled" OFF)
+option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
-
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
+option(USE_CCACHE "Build using Ccache if found on the path" ON)
+# Disable this on Windows due to linker OOM issues:
+#  LNK1248: image size (XXX) exceeds maximum allowable size (FFFFFFFF)
+#    https://github.com/AcademySoftwareFoundation/openvdb/issues/1718
+#    https://github.com/AcademySoftwareFoundation/openvdb/issues/1624
+cmake_dependent_option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes
+and methods against a pre-defined list of OpenVDB trees. This makes the core library larger and slower
+to compile, but speeds up the compilation of all dependent code by bypassing the expensive template
+instantation." OFF)
+option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
+option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
+option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 
+# Component dependency options
+cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, Imath and OpenEXR. Boost must be
@@ -121,7 +134,6 @@ option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BU
 
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
-option(USE_CCACHE "Build using Ccache if found on the path" ON)
 option(USE_STATIC_DEPENDENCIES [=[
 Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
 back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
@@ -135,15 +147,6 @@ Disable CMakes default system search paths when locating dependencies. When enab
 its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
-
-option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
-option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
-option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
-cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
-
-option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes and methods against a
-pre-defined list of OpenVDB trees. This makes the core library larger and slower to compile, but speeds up
-the compilation of all dependent code by bypassing the expensive template instantation." OFF)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
@@ -282,6 +285,30 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add cmake modules to installation command
 
+if(SKBUILD)
+  set(OPENVDB_INSTALL_BINDIR openvdb/${CMAKE_INSTALL_BINDIR})
+  set(OPENVDB_INSTALL_LIBDIR openvdb/${CMAKE_INSTALL_LIBDIR})
+  set(OPENVDB_INSTALL_INCLUDEDIR openvdb/${CMAKE_INSTALL_INCLUDEDIR})
+
+  if(OPENVDB_BUILD_NANOVDB)
+    set(NANOVDB_INSTALL_BINDIR nanovdb/${CMAKE_INSTALL_BINDIR})
+    set(NANOVDB_INSTALL_LIBDIR nanovdb/${CMAKE_INSTALL_LIBDIR})
+    set(NANOVDB_INSTALL_INCLUDEDIR nanovdb/${CMAKE_INSTALL_INCLUDEDIR})
+    set(NANOVDB_INSTALL_DOCDIR nanovdb/${CMAKE_INSTALL_DOCDIR})
+  endif()
+else()
+  set(OPENVDB_INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
+  set(OPENVDB_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+  set(OPENVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+
+  if(OPENVDB_BUILD_NANOVDB)
+    set(NANOVDB_INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
+    set(NANOVDB_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+    set(NANOVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+    set(NANOVDB_INSTALL_DOCDIR ${CMAKE_INSTALL_DOCDIR})
+  endif()
+endif()
+
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
@@ -295,7 +322,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/OpenVDBMayaSetup.cmake
     cmake/OpenVDBUtils.cmake
   )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
+  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${OPENVDB_INSTALL_LIBDIR}/cmake/OpenVDB)
 endif()
 
 # Configure component dependencies by loading the Houdini/Maya setup
@@ -357,27 +384,16 @@ include(cmake/config/OpenVDBCXX.cmake)
 
 #########################################################################
 
-# Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
-# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
-#     malloc: *** malloc_zone_unregister() failed for 0xaddress
-#   Houdini 17.5 and older ships with Jemalloc 3.6.0, so we make Tbbmalloc the default
-#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420). Later versions of
-#   Jemalloc are thought to work, but haven't been tested.
-# * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
-#   of injecting into the Windows runtime to replace the system allocator.
+# Configure malloc library. Use Jemalloc if available, tbbmalloc otherwise
 
-if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS) AND CONCURRENT_MALLOC STREQUAL "Auto")
-  if(WIN32 OR APPLE OR USE_MAYA)
+if(CONCURRENT_MALLOC STREQUAL "Auto")
+  find_package(Jemalloc QUIET)
+  if(NOT TARGET Jemalloc::jemalloc)
+    message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
+      It is recommended to use Jemalloc for optimum performance.")
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
-    find_package(Jemalloc QUIET)
-    if(NOT TARGET Jemalloc::jemalloc)
-      message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
-        It is recommended to use Jemalloc for optimum performance.")
-      set(CONCURRENT_MALLOC "Tbbmalloc")
-    else()
-      set(CONCURRENT_MALLOC "Jemalloc")
-    endif()
+    set(CONCURRENT_MALLOC "Jemalloc")
   endif()
 endif()
 
@@ -457,6 +473,33 @@ endif()
 if(NOT OPENVDB_BUILD_NANOVDB AND
    USE_NANOVDB)
   find_package(OpenVDB REQUIRED COMPONENTS nanovdb)
+endif()
+
+# Locate Python and nanobind if necessary
+if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHON_MODULE))
+
+  # Call find_package(Python ...)
+  find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Development Interpreter)
+  find_package(nanobind ${MINIMUM_NANOBIND_VERSION} REQUIRED)
+
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_PYTHON_VERSION)
+    if(Python_VERSION VERSION_LESS ${FUTURE_MINIMUM_PYTHON_VERSION})
+      message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
+
+  if(NOT DEFINED VDB_PYTHON_INSTALL_DIRECTORY)
+    if(DEFINED Python_SITELIB)
+      get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
+    else()
+      set(Python_PACKAGES_DIR "site-packages")
+    endif()
+    set(VDB_PYTHON_INSTALL_DIRECTORY
+      ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
+      CACHE STRING "The directory to install the openvdb and nanovdb Python modules."
+    )
+  endif()
 endif()
 
 

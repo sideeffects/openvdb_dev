@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file compiler/Compiler.h
 ///
@@ -23,6 +23,7 @@
 #include "openvdb_ax/ast/Parse.h"
 
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 
 #include <memory>
 #include <sstream>
@@ -128,14 +129,14 @@ public:
             for (const auto& e : errors) os << e << "\n";
             OPENVDB_THROW(AXSyntaxError, os.str());
         }
-        assert(syntaxTree);
+        OPENVDB_ASSERT(syntaxTree);
         typename ExecutableT::Ptr exe = this->compile<ExecutableT>(*syntaxTree, logger, data);
         if (!errors.empty()) {
             std::ostringstream os;
             for (const auto& e : errors) os << e << "\n";
             OPENVDB_THROW(AXCompilerError, os.str());
         }
-        assert(exe);
+        OPENVDB_ASSERT(exe);
         return exe;
     }
 
@@ -163,7 +164,7 @@ public:
             for (const auto& e : errors) os << e << "\n";
             OPENVDB_THROW(AXCompilerError, os.str());
         }
-        assert(exe);
+        OPENVDB_ASSERT(exe);
         return exe;
     }
 

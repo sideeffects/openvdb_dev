@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 
 set -e
 
@@ -121,7 +123,15 @@ if HAS_PARM -v || HAS_PARM --verbose; then
     # support older versions of CMake.
     CMAKE_EXTRA+=("-DCMAKE_VERBOSE_MAKEFILE=ON")
 fi
-if HAS_PARM --build-type; then CMAKE_EXTRA+=("-DCMAKE_BUILD_TYPE=${PARMS[--build-type]}"); fi
+if HAS_PARM --build-type; then
+    CMAKE_EXTRA+=("-DCMAKE_BUILD_TYPE=${PARMS[--build-type]}")
+    build_type="${PARMS[--build-type]}"
+    debug="Debug"
+    # Ignore case - if the build-type is Debug, we enable asserts
+    if [ "${build_type,,}" = "${debug,,}" ]; then
+        CMAKE_EXTRA+=("-DOPENVDB_ENABLE_ASSERTS=ON")
+    fi
+fi
 
 # Available components. If a component is not provided it is
 # explicitly set to OFF.
@@ -176,11 +186,12 @@ set -x
 # - always enabled the python tests with OPENVDB_BUILD_PYTHON_UNITTESTS if the python module is in use,
 #   regardless of the 'test' component being enabled or not (see the OPENVDB_BUILD_PYTHON_UNITTESTS option).
 cmake \
-    -DOPENVDB_USE_DEPRECATED_ABI_9=ON \
     -DOPENVDB_USE_DEPRECATED_ABI_10=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_11=ON \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DOPENVDB_BUILD_VDB_TOOL=ON \
+    -DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON \
     -DOPENVDB_TOOL_USE_NANO=OFF \
     -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \

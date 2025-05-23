@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file SOP_OpenVDB_Write.cc
 ///
@@ -8,8 +8,8 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-#include <openvdb_houdini/GEO_PrimVDB.h>
-#include <openvdb_houdini/GU_PrimVDB.h>
+#include <GEO/GEO_PrimVDB.h>
+#include <GU/GU_PrimVDB.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <set>

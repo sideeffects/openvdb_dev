@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include "Parse.h"
 #include "../Exceptions.h"
@@ -13,6 +13,8 @@
 #else
 #include "../grammar/generated/axparser.h"
 #endif
+
+#include <openvdb/util/Assert.h>
 
 #include <mutex>
 #include <string>
@@ -33,7 +35,7 @@ extern YY_BUFFER_STATE ax_scan_string(const char * str);
 extern void ax_delete_buffer(YY_BUFFER_STATE buffer);
 extern void axerror (openvdb::ax::ast::Tree**, char const *s) {
     //@todo: add check for memory exhaustion
-    assert(axlog);
+    OPENVDB_ASSERT(axlog);
     axlog->error(/*starts with 'syntax error, '*/s + 14,
         {axlloc.first_line, axlloc.first_column});
 }

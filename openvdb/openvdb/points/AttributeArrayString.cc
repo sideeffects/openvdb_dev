@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file points/AttributeArrayString.cc
 
@@ -7,6 +7,7 @@
 
 #include <openvdb/Metadata.h>
 #include <openvdb/MetaMap.h>
+#include <openvdb/util/Assert.h>
 
 #include <tbb/parallel_sort.h>
 
@@ -213,7 +214,7 @@ void StringMetaInserter::resetCache()
 
     for (const Index id : stringIndices) {
         if (key + size != id) {
-            assert(size > 0);
+            OPENVDB_ASSERT(size > 0);
             mIdBlocks.emplace_back(key, size);
             size = 0;
             key = id;

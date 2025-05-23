@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file openvdb_houdini/Utils.h
 /// @author FX R&D Simulation team
@@ -8,7 +8,7 @@
 #ifndef OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
-#include "GU_PrimVDB.h"
+#include <GU/GU_PrimVDB.h>
 #include <OP/OP_Node.h> // for OP_OpTypeId
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_Interrupt.h>

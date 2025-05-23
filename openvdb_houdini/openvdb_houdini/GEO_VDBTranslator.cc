@@ -1,12 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /*
  * Copyright (c)
  *      Side Effects Software Inc.  All rights reserved.
  */
 
-#include "GU_PrimVDB.h"
+#include <GU/GU_PrimVDB.h>
 #include "Utils.h"
 
 #include <UT/UT_EnvControl.h>

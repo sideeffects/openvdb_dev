@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @author Nick Avramoussis
 ///
@@ -50,6 +50,7 @@
 #include <openvdb/tools/ValueTransformer.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 
 #include <unordered_map>
 

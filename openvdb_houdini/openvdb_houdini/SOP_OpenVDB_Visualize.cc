@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file SOP_OpenVDB_Visualize.cc
 ///
@@ -1964,8 +1964,6 @@ template<typename GridType>
 void
 TreeVisualizer::operator()(const GridType& grid)
 {
-    using TreeType = typename GridType::TreeType;
-
     bool renderNodes = mParms.internalStyle || mParms.leafStyle;
     bool renderVoxels = mParms.tileStyle || mParms.voxelStyle;
 
