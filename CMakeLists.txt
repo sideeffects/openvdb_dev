@@ -90,7 +90,7 @@ option(USE_CCACHE "Build using Ccache if found on the path" ON)
 #  LNK1248: image size (XXX) exceeds maximum allowable size (FFFFFFFF)
 #    https://github.com/AcademySoftwareFoundation/openvdb/issues/1718
 #    https://github.com/AcademySoftwareFoundation/openvdb/issues/1624
-cmake_dependent_option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes
+option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes
 and methods against a pre-defined list of OpenVDB trees. This makes the core library larger and slower
 to compile, but speeds up the compilation of all dependent code by bypassing the expensive template
 instantation." OFF)
