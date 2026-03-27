@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(OpenVDBAXUnitTests LANGUAGES CXX)
 
 option(OPENVDB_AX_TEST_PROFILE "Switch on profiling for some of the unit tests." OFF)
@@ -35,6 +35,12 @@ endif()
 
 if(NOT OPENVDB_BUILD_AX)
   set(OPENVDBAX_LIB OpenVDB::openvdb_ax)
+elseif(TARGET openvdb_ax_static)
+  # Prefer the static lib when building the tests, as this should work with both
+  # static and shared builds of LLVM. Unfortunately, if LLVM was linked statically,
+  # we can get symbol conflicts with openvdbax.so exporting stuff.
+  # https://github.com/AcademySoftwareFoundation/openvdb/pull/2088#issuecomment-3337141828
+  set(OPENVDBAX_LIB openvdb_ax_static)
 else()
   set(OPENVDBAX_LIB openvdb_ax)
 endif()
@@ -49,8 +55,17 @@ elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
   list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS TBB::tbbmalloc)
 endif()
 
-find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
-list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS CppUnit::cppunit)
+find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
+
+if(TARGET GTest::gtest_main)
+  # New gtest targets as of CMake 3.20. Defined by both the Config and Module
+  # find modes
+  list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS GTest::gtest GTest::gtest_main)
+else()
+  # Older targets, only defined by the Module find_package calls
+  list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS GTest::GTest GTest::Main)
+endif()
+
 
 set(TEST_SOURCE_FILES
   ast/TestScanners.cc
@@ -122,6 +137,7 @@ add_executable(vdb_ax_test ${TEST_SOURCE_FILES})
 #  of fused instructions in tests where it matters.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   set_source_files_properties(
+      integration/TestAssign.cc
       integration/TestBinary.cc
       integration/TestStandardFunctions.cc
     PROPERTIES
@@ -133,6 +149,26 @@ target_include_directories(vdb_ax_test PRIVATE ../ .)
 
 if(OPENVDB_AX_TEST_PROFILE)
   target_compile_definitions(vdb_ax_test PRIVATE "-DPROFILE")
+endif()
+
+# If we're not building with asserts, determine if LLVM has asserts on. If it
+# doesn't we enable some extra tests
+if(NOT OPENVDB_ENABLE_ASSERTS)
+  get_filename_component(LLVM_ROOT "${LLVM_DIR}" DIRECTORY)
+  get_filename_component(LLVM_ROOT "${LLVM_ROOT}" DIRECTORY)
+  get_filename_component(LLVM_ROOT "${LLVM_ROOT}" DIRECTORY)
+  find_program(LLVM_CONFIG_EXECUTABLE llvm-config PATHS ${LLVM_ROOT}/bin)
+  if(LLVM_CONFIG_EXECUTABLE)
+    execute_process(
+      COMMAND ${LLVM_CONFIG_EXECUTABLE} --assertion-mode
+      OUTPUT_VARIABLE LLVM_HAS_ASSERTIONS
+      ERROR_QUIET # If we error for any reason, don't enable the tests
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(LLVM_HAS_ASSERTIONS STREQUAL "OFF")
+      # Enable the tests which would assert in LLVM
+      target_compile_definitions(vdb_ax_test PRIVATE "-DOPENVDB_AX_NO_LLVM_ASSERTS")
+    endif()
+  endif()
 endif()
 
 add_test(NAME vdb_ax_unit_test COMMAND vdb_ax_test -v WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../)

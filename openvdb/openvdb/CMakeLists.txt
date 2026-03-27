@@ -7,7 +7,15 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
+
+# CMP0167 skips the (deprecated) FindBoost.cmake module included with CMake
+# and instead uses the BoostConfig.cmake configuration file (included in
+# Boost v1.70.0 and later) directly.
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
+
 project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -135,6 +143,12 @@ if(USE_IMATH_HALF)
   message(STATUS "Found Imath: ${openvdb_imath_includes} (found suitable version \"${Imath_VERSION}\", "
     "minimum required is \"${MINIMUM_IMATH_VERSION}\")")
   unset(openvdb_imath_includes)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_IMATH_VERSION)
+    if(${Imath_VERSION} VERSION_LESS FUTURE_MINIMUM_IMATH_VERSION)
+      message(DEPRECATION "Support for Imath versions < ${FUTURE_MINIMUM_IMATH_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
 endif()
 
 if(USE_LOG4CPLUS)
@@ -316,6 +330,7 @@ if(USE_EXPLICIT_INSTANTIATION)
 
   set(OPENVDB_LIBRARY_INSTANTIATION_ALL_TREES
     MaskTree
+    HalfTree
     points::PointDataTree
     ${OPENVDB_LIBRARY_INSTANTIATION_VOLUME_TREES}
   )
@@ -405,7 +420,7 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/DDA.h
   math/FiniteDifference.h
   math/Half.h
-  math/LegacyFrustum.h
+  math/HalfDecl.h
   math/Maps.h
   math/Mat.h
   math/Mat3.h
@@ -484,6 +499,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/GridTransformer.h
   tools/Interpolation.h
   tools/LevelSetAdvect.h
+  tools/LevelSetDilatedMesh.h
   tools/LevelSetFilter.h
   tools/LevelSetFracture.h
   tools/LevelSetMeasure.h
@@ -492,6 +508,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/LevelSetRebuild.h
   tools/LevelSetSphere.h
   tools/LevelSetTracker.h
+  tools/LevelSetTubes.h
   tools/LevelSetUtil.h
   tools/Mask.h
   tools/Merge.h
@@ -520,6 +537,12 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/VolumeAdvect.h
   tools/VolumeToMesh.h
   tools/VolumeToSpheres.h
+)
+
+set(OPENVDB_LIBRARY_TOOLS_IMPL_INCLUDE_FILES
+  tools/impl/ConvexVoxelizer.h
+  tools/impl/LevelSetDilatedMeshImpl.h
+  tools/impl/LevelSetTubesImpl.h
 )
 
 set(OPENVDB_LIBRARY_TREE_INCLUDE_FILES
@@ -741,6 +764,7 @@ install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTAL
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/points)
 install(FILES ${OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/points/impl)
 install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tools)
+install(FILES ${OPENVDB_LIBRARY_TOOLS_IMPL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tools/impl)
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/util)
 install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/thread)

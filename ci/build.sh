@@ -33,8 +33,13 @@ PARMS[--target]=install
 PARMS[--build-dir]=build
 
 if [[ $RUNNER_NAME == *"8c-32g-300h"* ]]; then
-    # ASWF github actions runners have 8 threads
-    PARMS[-j]=8
+    if [[ $CXX == "g++" ]]; then
+        # GCC hits memory limits on runners, reduce threads
+        PARMS[-j]=6
+    else
+        # ASWF github actions runners have 8 threads
+        PARMS[-j]=8
+    fi
 else
     # Github actions runners have 2 threads
     # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
@@ -51,7 +56,8 @@ declare -A COMPONENTS
 COMPONENTS['core']='OPENVDB_BUILD_CORE'
 COMPONENTS['python']='OPENVDB_BUILD_PYTHON_MODULE'
 COMPONENTS['test']='OPENVDB_BUILD_UNITTESTS'
-COMPONENTS['bin']='OPENVDB_BUILD_BINARIES'
+# @todo split out vdb tool from this...
+COMPONENTS['bin']='OPENVDB_BUILD_VDB_PRINT,OPENVDB_BUILD_VDB_LOD,OPENVDB_BUILD_VDB_TOOL,OPENVDB_BUILD_VDB_TOOL_UNITTESTS'
 COMPONENTS['view']='OPENVDB_BUILD_VDB_VIEW'
 COMPONENTS['render']='OPENVDB_BUILD_VDB_RENDER'
 COMPONENTS['hou']='OPENVDB_BUILD_HOUDINI_PLUGIN'
@@ -150,7 +156,11 @@ for comp in "${!COMPONENTS[@]}"; do
             setting="ON"; break
         fi
     done
-    CMAKE_EXTRA+=("-D${COMPONENTS[$comp]}=$setting")
+    OPENVDB_TOGGLES="${COMPONENTS[$comp]}"
+    OPENVDB_TOGGLES=(${OPENVDB_TOGGLES//,/ })
+    for toggle in "${!OPENVDB_TOGGLES[@]}"; do
+        CMAKE_EXTRA+=("-D${OPENVDB_TOGGLES[$toggle]}=$setting")
+    done
 done
 
 ################################################
@@ -182,17 +192,14 @@ cd ${BUILD_DIR}
 set -x
 
 # Note:
-# - print and lod binary options are always on and can be toggles with: OPENVDB_BUILD_BINARIES=ON/OFF
+# - OPENVDB_BUILD_BINARIES is always ON, but each binary will be toggled depending on the provided comps
 # - always enabled the python tests with OPENVDB_BUILD_PYTHON_UNITTESTS if the python module is in use,
 #   regardless of the 'test' component being enabled or not (see the OPENVDB_BUILD_PYTHON_UNITTESTS option).
 cmake \
-    -DOPENVDB_USE_DEPRECATED_ABI_10=ON \
     -DOPENVDB_USE_DEPRECATED_ABI_11=ON \
-    -DOPENVDB_BUILD_VDB_PRINT=ON \
-    -DOPENVDB_BUILD_VDB_LOD=ON \
-    -DOPENVDB_BUILD_VDB_TOOL=ON \
-    -DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_12=ON \
     -DOPENVDB_TOOL_USE_NANO=OFF \
+    -DOPENVDB_BUILD_BINARIES=ON \
     -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \
     "${CMAKE_EXTRA[@]}" \

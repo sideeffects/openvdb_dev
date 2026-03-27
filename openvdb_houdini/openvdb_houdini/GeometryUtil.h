@@ -14,8 +14,10 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h> // for openvdb::util::COORD_OFFSETS
 
+#include <OBJ/OBJ_Camera.h>
 #include <GU/GU_Detail.h>
 #include <GEO/GEO_Primitive.h>
+#include <UT/UT_Version.h>
 
 #include <algorithm> // for std::max/min()
 #include <memory>
@@ -24,7 +26,6 @@
 
 
 class GA_SplittableRange;
-class OBJ_Camera;
 class OP_Context;
 class OP_Node;
 
@@ -39,8 +40,6 @@ class OP_Node;
 
 namespace openvdb_houdini {
 
-class Interrupter;
-
 
 /// Add geometry to the given detail to indicate the extents of a frustum transform.
 OPENVDB_HOUDINI_API
@@ -51,13 +50,20 @@ drawFrustum(GU_Detail&, const openvdb::math::Transform&,
 
 
 /// Construct a frustum transform from a Houdini camera.
+#if SYS_VERSION_MAJOR_INT >= 21
+openvdb::math::Transform::Ptr
+frustumTransformFromCamera(
+    const OBJ_CameraParms&, const UT_Matrix4D&,
+    float offset, float nearPlaneDist, float farPlaneDist,
+    float voxelDepthSize = 1.0, int voxelCountX = 100);
+#else
 OPENVDB_HOUDINI_API
 openvdb::math::Transform::Ptr
 frustumTransformFromCamera(
     OP_Node&, OP_Context&, OBJ_Camera&,
     float offset, float nearPlaneDist, float farPlaneDist,
     float voxelDepthSize = 1.0, int voxelCountX = 100);
-
+#endif
 
 ////////////////////////////////////////
 
@@ -78,12 +84,6 @@ pointInPrimGroup(GA_Offset ptnOffset, GU_Detail&, const GA_PrimitiveGroup&);
 OPENVDB_HOUDINI_API
 std::unique_ptr<GU_Detail>
 convertGeometry(const GU_Detail&, std::string& warning, openvdb::util::NullInterrupter*);
-
-
-OPENVDB_DEPRECATED_MESSAGE("openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter")
-OPENVDB_HOUDINI_API
-std::unique_ptr<GU_Detail>
-convertGeometry(const GU_Detail& detail, std::string& warning, Interrupter* boss);
 
 
 ////////////////////////////////////////

@@ -12,6 +12,7 @@
 #include <OP/OP_Node.h> // for OP_OpTypeId
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <functional>
@@ -28,6 +29,14 @@
 class GEO_PrimVDB;
 class GU_Detail;
 class UT_String;
+
+
+// Prior to Houdini 21.0 this was an unsigned.
+// After 21 they are defined in OP_DataTypes.h
+#if SYS_VERSION_MAJOR_INT < 21
+    using OP_InputIdx = unsigned;
+    using OP_OutputIdx = unsigned;
+#endif
 
 namespace openvdb_houdini {
 
@@ -199,35 +208,6 @@ private:
     UT_Interrupt* mUTI;
     bool mRunning;
     std::string mTitle;
-};
-
-
-/// @brief Deprecated wrapper class with the same interface as HoudiniInterrupter,
-/// however it does not derive from openvdb::util::NullInterrupter.
-/// Intended for backwards-compatibility only.
-class Interrupter
-{
-public:
-    OPENVDB_DEPRECATED_MESSAGE("openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter")
-    explicit Interrupter(const char* title = nullptr):
-        mInterrupt(title) { }
-
-    /// @brief Signal the start of an interruptible operation.
-    /// @param name  an optional descriptive name for the operation
-    void start(const char* name = nullptr) { mInterrupt.start(name); }
-    /// Signal the end of an interruptible operation.
-    void end() { mInterrupt.end(); }
-
-    /// @brief Check if an interruptible operation should be aborted.
-    /// @param percent  an optional (when >= 0) percentage indicating
-    ///     the fraction of the operation that has been completed
-    bool wasInterrupted(int percent=-1) { return mInterrupt.wasInterrupted(percent); }
-
-    /// @brief Return a reference to the base class of the stored interrupter
-    openvdb::util::NullInterrupter& interrupter() { return mInterrupt.interrupter(); }
-
-private:
-    HoudiniInterrupter mInterrupt;
 };
 
 

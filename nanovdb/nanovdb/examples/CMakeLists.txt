@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(NanoVDBExamples LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -100,14 +100,19 @@ nanovdb_example(NAME "ex_read_nanovdb_sphere")
 nanovdb_example(NAME "ex_read_nanovdb_sphere_accessor")
 nanovdb_example(NAME "ex_read_nanovdb_sphere_accessor_cuda")
 nanovdb_example(NAME "ex_index_grid_cuda")
-nanovdb_example(NAME "ex_nodemanager_cuda")
+nanovdb_example(NAME "ex_nodemanager_cuda" OPENVDB)
 nanovdb_example(NAME "ex_voxels_to_grid_cuda")
+nanovdb_example(NAME "ex_voxels_to_grid_mgpu")
 nanovdb_example(NAME "ex_modify_nanovdb_thrust")
 nanovdb_example(NAME "ex_map_pool_buffer")
 nanovdb_example(NAME "ex_bump_pool_buffer")
 nanovdb_example(NAME "ex_collide_level_set")
 nanovdb_example(NAME "ex_raytrace_fog_volume")
 nanovdb_example(NAME "ex_raytrace_level_set")
+nanovdb_example(NAME "ex_dilate_nanovdb_cuda" OPENVDB)
+nanovdb_example(NAME "ex_merge_nanovdb_cuda" OPENVDB)
+nanovdb_example(NAME "ex_refine_nanovdb_cuda" OPENVDB)
+nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 
 if(CUDAToolkit_FOUND)
   nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND

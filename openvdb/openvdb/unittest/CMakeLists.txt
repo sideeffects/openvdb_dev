@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -119,8 +119,10 @@ else()
     TestLeafManager.cc
     TestLeafMask.cc
     TestLeafOrigin.cc
+    TestLevelSetDilatedMesh.cc
     TestLevelSetFilter.cc
     TestLevelSetRayIntersector.cc
+    TestLevelSetTubes.cc
     TestLevelSetUtil.cc
     TestLinearInterp.cc
     TestMaps.cc
@@ -130,8 +132,8 @@ else()
     TestMerge.cc
     TestMeshToVolume.cc
     TestMetadata.cc
-    TestMetadataIO.cc
     TestMetaMap.cc
+    TestMetadataIO.cc
     TestMorphology.cc
     TestMultiResGrid.cc
     TestName.cc
@@ -139,6 +141,7 @@ else()
     TestNodeManager.cc
     TestNodeMask.cc
     TestNodeVisitor.cc
+    TestPCA.cc
     TestParticleAtlas.cc
     TestParticlesToLevelSet.cc
     TestPointAdvect.cc

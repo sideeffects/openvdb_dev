@@ -19,8 +19,9 @@
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointScatter.h>
 
-#include <cppunit/TestCase.h>
+#include <gtest/gtest.h>
 
+#include <fstream>
 #include <unordered_map>
 
 extern int sGenerateAX;
@@ -61,6 +62,7 @@ struct AXTestHarness
         , mUseSparseVolumes(true)
         , mUseDenseVolumes(true)
         , mUsePoints(true)
+        , mUseTolerance(false)
         , mVolumeBounds({0,0,0},{7,7,7})
         , mSparseVolumeConfig({
             {1, { openvdb::Coord(-7), openvdb::Coord(-15)}}, // 2 leaf level tiles
@@ -69,7 +71,13 @@ struct AXTestHarness
       , mOpts(openvdb::ax::CompilerOptions())
       , mCustomData(openvdb::ax::CustomData::create())
       , mErrors()
-      , mLogger([this](const std::string& msg) { this->mErrors += msg; } )
+      , mLogger([this](const std::string& msg) {
+            std::cerr << msg << std::endl;
+            this->mErrors += msg;
+        }
+        /*[](const std::string& msg) {
+            std::cerr << "Test Codegen Message (Warn):\n" << msg << std::endl;
+        }*/)
     {
         reset();
     }
@@ -205,6 +213,7 @@ struct AXTestHarness
     bool mUseSparseVolumes;
     bool mUseDenseVolumes;
     bool mUsePoints;
+    bool mUseTolerance;
     openvdb::CoordBBox mVolumeBounds;
     std::map<openvdb::Index, std::vector<openvdb::Coord>> mSparseVolumeConfig;
 
@@ -214,17 +223,16 @@ struct AXTestHarness
     openvdb::ax::Logger      mLogger;
 };
 
-class AXTestCase : public CppUnit::TestCase
+class AXTestCase : public ::testing::Test
 {
 public:
-    void tearDown() override
+    void TearDown() override
     {
         std::string out;
         for (auto& test : mTestFiles) {
             if (!test.second) out += test.first + "\n";
         }
-        CPPUNIT_ASSERT_MESSAGE("unused tests left in test case:\n" + out,
-            out.empty());
+        ASSERT_TRUE(out.empty()) << ("unused tests left in test case:\n" + out);
     }
 
     // @todo make pure
@@ -238,15 +246,13 @@ public:
             const std::ios_base::openmode flags = std::ios_base::out)
     {
         if (flags & std::ios_base::out) {
-            CPPUNIT_ASSERT_MESSAGE(
-                "duplicate test file found during test setup:\n" + filename,
-                mTestFiles.find(filename) == mTestFiles.end());
+            ASSERT_TRUE(mTestFiles.find(filename) == mTestFiles.end())
+                << ("duplicate test file found during test setup:\n" + filename);
             mTestFiles[filename] = false;
         }
         if (flags & std::ios_base::app) {
-            CPPUNIT_ASSERT_MESSAGE(
-                "test not found during ofstream append:\n" + filename,
-                mTestFiles.find(filename) != mTestFiles.end());
+            ASSERT_TRUE(mTestFiles.find(filename) != mTestFiles.end())
+                << ("test not found during ofstream append:\n" + filename);
         }
 
         if (sGenerateAX) {
@@ -260,21 +266,19 @@ public:
     template <typename ...Args>
     void execute(const std::string& filename, Args&&... args)
     {
-        CPPUNIT_ASSERT_MESSAGE(
-            "test not found during execution:\n" + this->dir() + "/" + filename,
-            mTestFiles.find(filename) != mTestFiles.end());
+        ASSERT_TRUE(mTestFiles.find(filename) != mTestFiles.end())
+            << ("test not found during execution:\n" + this->dir() + "/" + filename);
         mTestFiles[filename] = true; // has been used
 
           // execute
         const bool success = mHarness.executeCode(this->dir() + "/" + filename, args...);
-        CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + filename + "\n" + mHarness.errors(),
-                success);
+        ASSERT_TRUE(success)
+            << ("error thrown during test: " + filename + "\n" + mHarness.errors());
 
         // check
         std::stringstream out;
         const bool correct = mHarness.checkAgainstExpected(out);
-        //CPPUNIT_ASSERT(correct);
-        CPPUNIT_ASSERT_MESSAGE(out.str(), correct);
+        ASSERT_TRUE(correct) << out.str();
     }
 
 protected:
@@ -291,7 +295,7 @@ protected:
 #define AXTESTS_STANDARD_ASSERT_HARNESS(harness) \
     {   std::stringstream out; \
         const bool correct = harness.checkAgainstExpected(out); \
-        CPPUNIT_ASSERT_MESSAGE(out.str(), correct); }
+        ASSERT_TRUE(correct) << out.str(); }
 
 #define AXTESTS_STANDARD_ASSERT() \
       AXTESTS_STANDARD_ASSERT_HARNESS(mHarness);

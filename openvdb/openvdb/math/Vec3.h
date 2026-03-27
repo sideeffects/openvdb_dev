@@ -391,8 +391,8 @@ public:
     /// return normalized this, or (1, 0, 0) if this is null vector
     Vec3<T> unitSafe() const
     {
-        T l2 = lengthSqr();
-        return l2 ? *this / static_cast<T>(sqrt(l2)) : Vec3<T>(1, 0 ,0);
+        const T l2 = lengthSqr();
+        return !isApproxZero(l2) ? *this / static_cast<T>(sqrt(l2)) : Vec3<T>(1, 0 ,0);
     }
 
     // Number of cols, rows, elements
@@ -663,11 +663,13 @@ using Vec3i = Vec3<int32_t>;
 using Vec3ui = Vec3<uint32_t>;
 using Vec3s = Vec3<float>;
 using Vec3d = Vec3<double>;
+using Vec3h = Vec3<math::half>;
 
 OPENVDB_IS_POD(Vec3i)
 OPENVDB_IS_POD(Vec3ui)
 OPENVDB_IS_POD(Vec3s)
 OPENVDB_IS_POD(Vec3d)
+OPENVDB_IS_POD(Vec3h)
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

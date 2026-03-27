@@ -61,7 +61,7 @@ jobs:
       (github.event_name != 'workflow_dispatch' ||
        github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'houdini')
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-houdini:${{ matrix.config.hou_hash }}
     env:
       CXX: clang++
@@ -70,23 +70,13 @@ jobs:
     strategy:
       matrix:
         config:
-          - { houdini_version: '20.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_0-newabi' }
+          - { houdini_version: '21.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '21_0' }
           - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
       image: aswf/ci-base:2024
     steps:
     - uses: actions/checkout@v3
-    # We bumped from the 2021 CI image to 2023 here to fix some OpenSSL issues
-    # with the Houdini download script. In so doing we broke some of the caching
-    # between this job and the jobs in houdini.yml which _don't_ use the 2023
-    # image yet. The issue is that the cache action will use zstd if it's
-    # available to zip the cache and this causes it to be inserted with a unique
-    # hash which images without zstd (i.e. the 2021/2022 images don't have
-    # access to). For now, uninstall zstd here instead of installing it
-    # everywhere and ask the LF to add zstd to the older base images.
-    - name: remove zstd
-      run: yum -y remove zstd
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -113,7 +103,7 @@ jobs:
     # Note that macos-14 (current macos-latest) switches to M1. We could instead test
     # the arm build here instead of the x86 one.
     runs-on: macos-latest
-    name: macos-houdini-20
+    name: macos-houdini
     env:
       HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
       HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
@@ -123,7 +113,7 @@ jobs:
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
     - name: download_houdini
-      run: ./ci/download_houdini.sh 20.0 macosx_arm64_clang14.0_13 --prod
+      run: ./ci/download_houdini.sh 21.0 macosx_arm64_clang15.0_14 --prod
     - name: install_houdini
       run: |
         mkdir $HOME/houdini_install
@@ -146,31 +136,38 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'extra'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
-      image: aswf/ci-openvdb:2024
+      image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
       CXX: clang++
     strategy:
       matrix:
         config:
-          - { name: 'all',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
-          - { name: 'half',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'sse',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'avx',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=AVX' }
-          - { name: 'numpy', build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_NUMPY=ON -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
-          - { name: 'asan',  build: 'asan',    components: 'core,test',                                      cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
-          - { name: 'ubsan', build: 'ubsan',   components: 'core,test',                                      cmake: '-DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
-          - { name: 'c++20', build: 'Release', components: 'core,test',                                      cmake: '-DCMAKE_CXX_STANDARD=20' }
-          - { name: 'conf',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
+          - { name: 'all',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
+          - { name: 'half',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'sse',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=SSE42' }
+          - { name: 'avx',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'pygrid', image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
+          - { name: 'asan',   image: '2026',           build: 'asan',    components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
+          - { name: 'ubsan',  image: '2026',           build: 'ubsan',   components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
+          - { name: 'c++20',  image: '2026',           build: 'Release', components: 'core,test',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
+          - { name: 'conf',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
-      #if: contains(container.image, '2023') == false
-      run: ./ci/install_nanobind.sh 2.0.0
+      run: ./ci/install_nanobind.sh 2.5.0
+      # 2026 images are broken with gtest/glfw/exr installs
+    - name: deps
+      if: contains(matrix.config.image, '2026')
+      run: |
+        ./ci/install_gtest.sh latest
+        ./ci/install_glfw.sh latest
+        ./ci/install_imath.sh v3.2.2
+        ./ci/install_exr.sh v3.2.2
     - name: build
       run: >
         ./ci/build.sh -v
@@ -192,21 +189,22 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runson: ubuntu-latest, cxx: g++,     cmake: '' }
+          # llvm-17 is currently the default which has symbol issues with the python module
+          - { runson: ubuntu-latest, cxx: g++, cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
           # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
           # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
           # @todo gcc on macos
-          - { runson: macos-latest,  cxx: '',      cmake: '-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@15/bin/clang++ -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm' }
+          - { runson: macos-latest, cxx: '', cmake: '-DLLVM_DIR=/opt/homebrew/opt/llvm@20/lib/cmake/llvm' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-15-dev libgtest-dev libgmock-dev libcppunit-dev
-            ./ci/install_nanobind.sh 2.0.0
+            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev libgtest-dev libgmock-dev python3-numpy
+            ./ci/install_nanobind.sh 2.5.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            ./ci/install_macos.sh 15
+            ./ci/install_macos.sh 20
             ./ci/install_tbb_macos.sh
           else
             echo "$RUNNER_OS not supported"; exit 1
@@ -216,7 +214,12 @@ jobs:
           ./ci/build.sh -v
           --build-type=Release
           --components=\"core,axcore,python,bin,render,test,axbin\"
-          --cargs=\"-DCMAKE_CXX_STANDARD=20 -DOPENVDB_USE_DELAYED_LOADING=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ${{ matrix.config.cmake }}\"
+          --cargs=\'
+          -DCMAKE_CXX_STANDARD=20
+          -DOPENVDB_USE_DELAYED_LOADING=OFF
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+          ${{ matrix.config.cmake }}
+          \'
       - name: test
         run: cd build && ctest -V
 
@@ -253,6 +256,10 @@ jobs:
     - name: install
       shell: powershell
       run: .\ci\install_windows.ps1
+    - name: install_numpy
+      if: matrix.config.vc == 'x64-windows'
+      shell: powershell
+      run: .\ci\install_windows_numpy.ps1
     - name: build
       run: >
         ./ci/build.sh -v
@@ -284,7 +291,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -294,15 +301,14 @@ jobs:
     strategy:
       matrix:
         config:
-          # Unified
-          - { image: '2023-clang15', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2023-clang15', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang18.1', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          # @note  LLVM 17 builds are incompatible with the vdb python plugin on linux
+          - { image: '2024-clang17.2', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: nanobind
-        #f: contains(matrix.config.image, '2023') == false
-        run: ./ci/install_nanobind.sh 2.0.0
+        run: ./ci/install_nanobind.sh 2.5.0
       - name: build
         run: >
           ./ci/build.sh -v
@@ -341,14 +347,14 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: macos-13
+    runs-on: ${{ matrix.config.runner }}
     name: macos-cxx:${{ matrix.config.cxx }}-llvm:${{ matrix.config.llvm }}-${{ matrix.config.build }}
     env:
       CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
         config:
-          - { cxx: 'clang++', build: 'Release', llvm: '15' }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '20' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -378,7 +384,7 @@ jobs:
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
-    name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
+    name: ${{ matrix.config.vc }}-${{ matrix.config.crt }}-${{ matrix.config.build }}-llvm${{ matrix.config.llvm }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       # Export this with '' avoid bash treating \ as escape
@@ -392,17 +398,22 @@ jobs:
           # @todo  We don't currently run the axtests with shared builds of ax
           # due to symbol issues using LLVM as a static lib (which is the only
           # option on Windows).
-          - { vc: 'x64-windows',        crt: 'MD',  components: 'core,bin,axcore,axbin,python', build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
-          - { vc: 'x64-windows-static', crt: 'MT',  components: 'core,bin,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', crt: 'MTd', components: 'core,bin,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          # @note  currently only test static builds with MT as building LLVM as
+          # a shared lib on windows is a bit dicey
+          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreadedDebug', components: 'core,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows',        llvm: '18.1.0', crt: 'MultiThreadedDLL',   components: 'core,axcore,axbin',        build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
+          - { vc: 'x64-windows-static', llvm: '15.0.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: llvm
-      run: ./ci/install_llvm_windows.sh ${{ matrix.config.crt }}
+      run: ./ci/install_llvm_windows.sh ${{ matrix.config.llvm }} ${{ matrix.config.crt }}
     - name: install
       shell: powershell
-      run: .\ci\install_windows.ps1
+      run: |
+        vcpkg update
+        vcpkg install tbb gtest
     - name: build
       run: >
         ./ci/build.sh -v
@@ -410,10 +421,13 @@ jobs:
         --components="${{ matrix.config.components }}"
         --cargs=\'
         -A x64 -G \"Visual Studio 17 2022\"
+        -DOPENVDB_USE_DELAYED_LOADING=OFF
+        -DUSE_BLOSC=OFF \
+        -DUSE_ZLIB=OFF \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
         -DMSVC_COMPRESS_PDB=ON
-        -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
+        -DOPENVDB_AX_TEST_CMD_DOWNLOADS=OFF
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DLLVM_DIR=\"${HOME}\\llvm_install\\lib\\cmake\\llvm\"
         -DCMAKE_INSTALL_PREFIX=\"${VDB_INSTALL_PREFIX}\"
@@ -485,7 +499,7 @@ jobs:
         \'
     - name: test
       shell: bash
-      run: cd build && ctest -V -E ".*cuda.*"
+      run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
 
   #############################################################################
   ################################## Blosc ####################################
@@ -496,13 +510,13 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'blosc'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-blosc:${{ matrix.blosc }}
     container:
-      image: aswf/ci-base:2023
+      image: aswf/ci-openvdb:2025-clang19.1
     strategy:
       matrix:
-        blosc: ['1.18.0','1.19.0','1.20.0','1.21.0']
+        blosc: ['1.21.0', 'latest']
       fail-fast: false
     steps:
     - uses: actions/checkout@v3

@@ -9,29 +9,15 @@
 #include <openvdb_ax/compiler/CustomData.h>
 #include <openvdb_ax/Exceptions.h>
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestArrayUnpack : public unittest_util::AXTestCase
 {
 public:
-
     std::string dir() const override { return GET_TEST_DIRECTORY(); }
-
-    CPPUNIT_TEST_SUITE(TestArrayUnpack);
-    CPPUNIT_TEST(componentVectorAssignment);
-    CPPUNIT_TEST(componentMatrixAssignment);
-    CPPUNIT_TEST_SUITE_END();
-
-    void componentVectorAssignment();
-    void componentMatrixAssignment();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestArrayUnpack);
-
-void
-TestArrayUnpack::componentVectorAssignment()
+TEST_F(TestArrayUnpack, componentVectorAssignment)
 {
     const std::string code = R"(
 vec2@test1[0] = vec2@test2[1];
@@ -51,7 +37,7 @@ vec4@test6[1] = vec4@test6[0];
         for (const auto& s : suffixes) {
             std::string repl = code;
             const std::string type = (s == 'i' ? "int" : (s == 'f' ? "float" : (s == 'd' ? "double" : "")));
-            CPPUNIT_ASSERT(!type.empty());
+            ASSERT_TRUE(!type.empty());
 
             unittest_util::replace(repl, "vec2", std::string("vec2").append(1, s));
             unittest_util::replace(repl, "vec3", std::string("vec3").append(1, s));
@@ -113,8 +99,7 @@ vec4@test6[1] = vec4@test6[0];
     }
 }
 
-void
-TestArrayUnpack::componentMatrixAssignment()
+TEST_F(TestArrayUnpack, componentMatrixAssignment)
 {
     const std::string code = R"(
 mat3@test1[0] = mat3@test2[4];
@@ -154,15 +139,19 @@ mat4@test6[13] = mat4@test5[12];
 mat4@test5[14] = mat4@test6[5];
 mat4@test6[15] = mat4@test5[9];
 
-mat4@test7[0,0] = mat4@test8[3,3];
-mat4@test8[0,1] = mat4@test7[0,0];
-mat4@test7[0,2] = mat4@test8[2,3];
-mat4@test8[0,3] = mat4@test7[1,2];
-mat4@test7[1,0] = mat4@test8[3,1];
-mat4@test8[1,1] = mat4@test7[0,1];
-mat4@test7[1,2] = mat4@test8[2,2];
-mat4@test8[1,3] = mat4@test7[2,0];
-mat4@test7[2,0] = mat4@test8[0,2];
+int   a = 1;
+int32 b = 2;
+int64 c = 3;
+
+mat4@test7[0,0] = mat4@test8[c,c];
+mat4@test8[0,a] = mat4@test7[0,0];
+mat4@test7[0,b] = mat4@test8[b,c];
+mat4@test8[0,c] = mat4@test7[a,b];
+mat4@test7[a,0] = mat4@test8[c,a];
+mat4@test8[a,a] = mat4@test7[0,a];
+mat4@test7[a,b] = mat4@test8[b,b];
+mat4@test8[a,c] = mat4@test7[b,0];
+mat4@test7[b,0] = mat4@test8[0,b];
 mat4@test8[2,1] = mat4@test7[1,3];
 mat4@test7[2,2] = mat4@test8[3,2];
 mat4@test8[2,3] = mat4@test7[0,3];
@@ -178,7 +167,7 @@ mat4@test8[3,3] = mat4@test7[2,1];
             unittest_util::replace(repl, "mat3", std::string("mat3").append(1,s));
             unittest_util::replace(repl, "mat4", std::string("mat4").append(1,s));
             const std::string type = s == 'f' ? "float" : s == 'd' ? "double" : "";
-            CPPUNIT_ASSERT(!type.empty());
+            ASSERT_TRUE(!type.empty());
             this->registerTest(repl, "array_unpack.mat." + type + ".ax");
         }
     };
@@ -251,5 +240,3 @@ mat4@test8[3,3] = mat4@test7[2,1];
     }
 
 }
-
-

@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(OpenVDBDocs LANGUAGES NONE)
 
 include(GNUInstallDirs)
@@ -44,6 +44,7 @@ set(DOXY_FILES
   openvdb/openvdb/points/impl
   openvdb/openvdb/python/pyopenvdb.h
   openvdb/openvdb/tools
+  openvdb/openvdb/tools/impl
   openvdb/openvdb/tree
   openvdb/openvdb/util
   doc/build.txt

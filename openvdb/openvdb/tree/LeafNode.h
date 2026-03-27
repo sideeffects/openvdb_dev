@@ -1366,6 +1366,8 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
 {
+    io::checkFormatVersion(is);
+
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
 
@@ -1382,13 +1384,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     }
 
     int8_t numBuffers = 1;
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        // Read in the origin.
-        is.read(reinterpret_cast<char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
-
-        // Read in the number of buffers, which should now always be one.
-        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
-    }
 
     CoordBBox nodeBBox = this->getNodeBoundingBox();
     if (!clipBBox.hasOverlap(nodeBBox)) {
@@ -1406,14 +1401,9 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         const bool delayLoad = ((mappedFile.get() != nullptr) && clipBBox.isInside(nodeBBox));
 
         if (delayLoad) {
-            mBuffer.setOutOfCore(true);
-            mBuffer.mFileInfo = new typename Buffer::FileInfo;
-            mBuffer.mFileInfo->meta = meta;
-            mBuffer.mFileInfo->bufpos = is.tellg();
-            mBuffer.mFileInfo->mapping = mappedFile;
-            // Save the offset to the value mask, because the in-memory copy
+            // Save the offset to the value mask (maskpos), because the in-memory copy
             // might change before the value buffer gets read.
-            mBuffer.mFileInfo->maskpos = maskpos;
+            mBuffer.enableOutOfCore(meta, is.tellg(), mappedFile, maskpos);
             // Skip over voxel values.
             skipCompressedValues(seekable, is, fromHalf);
         } else {

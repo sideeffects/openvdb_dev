@@ -330,4 +330,19 @@ TEST_F(TestInternalNode, testUnsafe)
         EXPECT_EQ(internalNode.getValueUnsafe(32), 13.0f);
         EXPECT_TRUE(internalNode.isValueOn(32));
     }
+
+    { // set value mask unsafe
+        InternalNode internalNode2(ijk, 1.0f);
+
+        EXPECT_TRUE(internalNode2.isValueOff(34));
+
+        InternalNode::NodeMaskType tmpMask;
+        tmpMask.setOn(34);
+        tmpMask.setOn(36);
+        internalNode2.setValueMaskUnsafe(tmpMask);
+        EXPECT_TRUE(internalNode2.isValueOff(33));
+        EXPECT_TRUE(internalNode2.isValueOn(34));
+        EXPECT_TRUE(internalNode2.isValueOff(35));
+        EXPECT_TRUE(internalNode2.isValueOn(36));
+    }
 }
