@@ -13,6 +13,7 @@
     #define OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
 #endif
 
+#include <tbb/version.h>
 
 /// @note tbb/blocked_range.h is the ONLY include that persists from TBB 2020
 ///   to TBB 2021 that itself includes the TBB specific version header files.
